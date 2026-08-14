@@ -1,0 +1,102 @@
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: #0f172a;
+	color: #e2e8f0;
+	font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+}
+
+.app header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 1rem 1.25rem;
+	border-bottom: 1px solid #1f2937;
+	background: #111827;
+}
+
+.app h1 {
+	font-size: 1.1rem;
+	margin: 0;
+}
+
+.app .meta {
+	display: flex;
+	gap: .75rem;
+	align-items: center;
+	font-size: .9rem;
+	color: #94a3b8;
+}
+
+
+/* BEFORE
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 50% 50%;
+  height: calc(100vh - 150px);
+}
+*/
+
+/* AFTER */
+.grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-auto-rows: minmax(0, 1fr);
+	/* Let the grid create as many rows as needed */
+	gap: 0;
+	/* optional: keep tight spacing */
+	height: calc(100vh - 150px);
+}
+
+.pane {
+	display: flex;
+	flex-direction: column;
+	border-right: 1px solid #1f2937;
+	border-bottom: 1px solid #1f2937;
+	min-height: 0;
+}
+
+.pane:nth-child(2n) {
+	border-right: none;
+}
+
+.pane h2 {
+	margin: 0;
+	padding: .5rem .75rem;
+	border-bottom: 1px solid #1f2937;
+	background: #0b1220;
+	font-size: .95rem;
+}
+
+.output {
+	border-bottom: none;
+}
+
+footer {
+	padding: .75rem 1.25rem;
+	border-top: 1px solid #1f2937;
+	color: #94a3b8;
+}
+
+.errors {
+	background: #1f2937;
+	border: 1px solid #334155;
+	color: #fecaca;
+	padding: .5rem .75rem;
+	margin-bottom: .5rem;
+	border-radius: .35rem;
+}
+
+.errors ul {
+	margin: .25rem 0 0 1rem;
+}

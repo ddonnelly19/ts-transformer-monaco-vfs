@@ -1,0 +1,30 @@
+{
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "ESNext",
+		"lib": [
+			"ESNext",
+			"DOM",
+			"WebWorker"
+		],
+		"jsx": "react-jsx",
+		"moduleResolution": "Bundler",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"sourceMap": true,
+		"allowSyntheticDefaultImports": true,
+		"paths": {
+			"@ts-morph/common": [
+				"./tsmorph.d.ts"	
+			],
+			"typescript": [
+				"./typescript.internal.d.ts"
+			]
+		}
+	},
+	"include": [
+		"src"
+	],
+}

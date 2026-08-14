@@ -1,0 +1,54 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Dev (Vite)",
+			"type": "npm",
+			"script": "dev",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "vite",
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				],
+				"pattern": {
+					"regexp": ".",
+					"file": 1,
+					"location": 2,
+					"message": 3
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "Local:\\s*https?://localhost:\\d+/?",
+					"endsPattern": "###__NEVER__ENDS__###"
+				}
+			}
+		},
+		{
+			"type": "npm",
+			"script": "dev",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: dev",
+			"isBackground": true
+		},
+		{
+			"label": "Generate TypeScript internal .d.ts",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/generate-internal-dts.js"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "Long-path safe generation of a single internal TypeScript .d.ts"
+		}
+	]
+}
