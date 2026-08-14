@@ -142,7 +142,6 @@ export const fixProtoType: ts.TransformerFactory<ts.SourceFile> = (context) => (
 			return ts.visitEachChild(node, visitor, context);
 		} catch (ex) {
 			console.error(
-				`Error visiting children for node ${ts.SyntaxKind[node.kind]}: "${printNode(node)}"`,
 				ex
 			);
 			return node;
@@ -155,3 +154,5 @@ export const fixProtoType: ts.TransformerFactory<ts.SourceFile> = (context) => (
 		return sourceFile;
 	}
 }
+
+export default ({}) => fixProtoType

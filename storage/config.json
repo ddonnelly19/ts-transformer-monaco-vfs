@@ -1,0 +1,16 @@
+{
+	"target": "ES2022",
+	"module": "ESNext",
+	"strict": true,
+	"noImplicitAny": true,
+	"noUncheckedIndexedAccess": true,
+	"allowJs": true,
+	"checkJs": true,
+	"allowNonTsExtensions": true,
+	"allowSyntheticDefaultImports": true,
+	"paths": {
+		"typescript": [
+			"file:///typescript.d.ts"
+		]
+	}
+}

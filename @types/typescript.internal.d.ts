@@ -7,7 +7,7 @@ License at http://www.apache.org/licenses/LICENSE-2.0
 THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
 WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-MERCHANTABLITY OR NON-INFRINGEMENT.
+MERCHANTABILITY OR NON-INFRINGEMENT.
 
 See the Apache Version 2.0 License for specific language governing permissions
 and limitations under the License.
@@ -2849,6 +2849,7 @@ declare namespace ts {
             export enum ScriptTarget {
                 /** @deprecated */
                 ES3 = "es3",
+                /** @deprecated */
                 ES5 = "es5",
                 ES6 = "es6",
                 ES2015 = "es2015",
@@ -2861,9 +2862,11 @@ declare namespace ts {
                 ES2022 = "es2022",
                 ES2023 = "es2023",
                 ES2024 = "es2024",
+                ES2025 = "es2025",
                 ESNext = "esnext",
                 JSON = "json",
                 Latest = "esnext",
+                LatestStandard = "es2025",
             }
         }
         namespace typingsInstaller {
@@ -3724,6 +3727,10 @@ declare namespace ts {
             private onTypingInstallerWatchInvoke;
             /** @internal */
             watchTypingLocations(files: readonly string[] | undefined): void;
+            /** @internal */
+            skipWatchingFailedLookups(path: Path): boolean | undefined;
+            /** @internal */
+            skipWatchingTypeRoots(): boolean | undefined;
             /** @internal */
             getCurrentProgram(): Program | undefined;
             protected removeExistingTypings(include: string[]): string[];
@@ -7539,6 +7546,10 @@ declare namespace ts {
      * @internal
      */
     function equateStringsCaseSensitive(a: string, b: string): boolean;
+    /** @internal */
+    function compareComparableValues(a: string | undefined, b: string | undefined): Comparison;
+    /** @internal */
+    function compareComparableValues(a: number | undefined, b: number | undefined): Comparison;
     /**
      * Compare two numeric values for their order relative to each other.
      * To compare strings, use any of the `compareStrings` functions.
@@ -12680,97 +12691,99 @@ declare namespace ts {
     enum TypeFlags {
         Any = 1,
         Unknown = 2,
-        String = 4,
-        Number = 8,
-        Boolean = 16,
-        Enum = 32,
-        BigInt = 64,
-        StringLiteral = 128,
-        NumberLiteral = 256,
-        BooleanLiteral = 512,
-        EnumLiteral = 1024,
-        BigIntLiteral = 2048,
-        ESSymbol = 4096,
-        UniqueESSymbol = 8192,
-        Void = 16384,
-        Undefined = 32768,
-        Null = 65536,
-        Never = 131072,
-        TypeParameter = 262144,
-        Object = 524288,
-        Union = 1048576,
-        Intersection = 2097152,
-        Index = 4194304,
-        IndexedAccess = 8388608,
-        Conditional = 16777216,
-        Substitution = 33554432,
-        NonPrimitive = 67108864,
-        TemplateLiteral = 134217728,
-        StringMapping = 268435456,
+        Undefined = 4,
+        Null = 8,
+        Void = 16,
+        String = 32,
+        Number = 64,
+        BigInt = 128,
+        Boolean = 256,
+        ESSymbol = 512,
+        StringLiteral = 1024,
+        NumberLiteral = 2048,
+        BigIntLiteral = 4096,
+        BooleanLiteral = 8192,
+        UniqueESSymbol = 16384,
+        EnumLiteral = 32768,
+        Enum = 65536,
+        NonPrimitive = 131072,
+        Never = 262144,
+        TypeParameter = 524288,
+        Object = 1048576,
+        Index = 2097152,
+        TemplateLiteral = 4194304,
+        StringMapping = 8388608,
+        Substitution = 16777216,
+        IndexedAccess = 33554432,
+        Conditional = 67108864,
+        Union = 134217728,
+        Intersection = 268435456,
         /** @internal */
         Reserved1 = 536870912,
         /** @internal */
         Reserved2 = 1073741824,
         /** @internal */
+        Reserved3 = -2147483648,
+        /** @internal */
         AnyOrUnknown = 3,
         /** @internal */
-        Nullable = 98304,
-        Literal = 2944,
-        Unit = 109472,
-        Freshable = 2976,
-        StringOrNumberLiteral = 384,
+        Nullable = 12,
+        Literal = 15360,
+        Unit = 97292,
+        Freshable = 80896,
+        StringOrNumberLiteral = 3072,
         /** @internal */
-        StringOrNumberLiteralOrUnique = 8576,
+        StringOrNumberLiteralOrUnique = 19456,
         /** @internal */
-        DefinitelyFalsy = 117632,
-        PossiblyFalsy = 117724,
+        DefinitelyFalsy = 15388,
+        PossiblyFalsy = 15868,
         /** @internal */
-        Intrinsic = 67359327,
-        StringLike = 402653316,
-        NumberLike = 296,
-        BigIntLike = 2112,
-        BooleanLike = 528,
-        EnumLike = 1056,
-        ESSymbolLike = 12288,
-        VoidLike = 49152,
+        Intrinsic = 402431,
+        StringLike = 12583968,
+        NumberLike = 67648,
+        BigIntLike = 4224,
+        BooleanLike = 8448,
+        EnumLike = 98304,
+        ESSymbolLike = 16896,
+        VoidLike = 20,
         /** @internal */
-        Primitive = 402784252,
+        Primitive = 12713980,
         /** @internal */
-        DefinitelyNonNullable = 470302716,
+        DefinitelyNonNullable = 13893600,
         /** @internal */
-        DisjointDomains = 469892092,
-        UnionOrIntersection = 3145728,
-        StructuredType = 3670016,
-        TypeVariable = 8650752,
-        InstantiableNonPrimitive = 58982400,
-        InstantiablePrimitive = 406847488,
-        Instantiable = 465829888,
-        StructuredOrInstantiable = 469499904,
+        DisjointDomains = 12812284,
+        UnionOrIntersection = 402653184,
+        StructuredType = 403701760,
+        TypeVariable = 34078720,
+        InstantiableNonPrimitive = 117964800,
+        InstantiablePrimitive = 14680064,
+        Instantiable = 132644864,
+        StructuredOrInstantiable = 536346624,
         /** @internal */
-        ObjectFlagsType = 3899393,
+        ObjectFlagsType = 403963917,
         /** @internal */
-        Simplifiable = 25165824,
+        Simplifiable = 102760448,
         /** @internal */
-        Singleton = 67358815,
-        Narrowable = 536624127,
+        Singleton = 394239,
+        Narrowable = 536575971,
         /** @internal */
-        IncludesMask = 473694207,
+        IncludesMask = 416808959,
         /** @internal */
-        IncludesMissingType = 262144,
+        IncludesMissingType = 524288,
         /** @internal */
-        IncludesNonWideningType = 4194304,
+        IncludesNonWideningType = 2097152,
         /** @internal */
-        IncludesWildcard = 8388608,
+        IncludesWildcard = 33554432,
         /** @internal */
-        IncludesEmptyObject = 16777216,
+        IncludesEmptyObject = 67108864,
         /** @internal */
-        IncludesInstantiable = 33554432,
+        IncludesInstantiable = 16777216,
         /** @internal */
         IncludesConstrainedTypeVariable = 536870912,
         /** @internal */
         IncludesError = 1073741824,
         /** @internal */
-        NotPrimitiveUnion = 36323331,
+        NotPrimitiveUnion = 286523411,
     }
     type DestructuringPattern = BindingPattern | ObjectLiteralExpression | ArrayLiteralExpression;
     /** @internal */
@@ -12891,11 +12904,11 @@ declare namespace ts {
         PropagatingFlags = 458752,
         /** @internal */
         InstantiatedMapped = 96,
-        /** @internal */
-        ObjectTypeKindMask = 1343,
         ContainsSpread = 2097152,
         ObjectRestType = 4194304,
         InstantiationExpressionType = 8388608,
+        /** @internal */
+        ObjectTypeKindMask = 142607679,
         /** @internal */
         IsClassInstanceClone = 16777216,
         /** @internal */
@@ -13655,6 +13668,7 @@ declare namespace ts {
         disableSourceOfProjectReferenceRedirect?: boolean;
         disableSolutionSearching?: boolean;
         disableReferencedProjectLoad?: boolean;
+        /** @deprecated */
         downlevelIteration?: boolean;
         emitBOM?: boolean;
         emitDecoratorMetadata?: boolean;
@@ -13756,6 +13770,8 @@ declare namespace ts {
         strictNullChecks?: boolean;
         strictPropertyInitialization?: boolean;
         strictBuiltinIteratorReturn?: boolean;
+        /** @internal */
+        stableTypeOrdering?: boolean;
         stripInternal?: boolean;
         /** @deprecated */
         suppressExcessPropertyErrors?: boolean;
@@ -13857,6 +13873,7 @@ declare namespace ts {
     enum ScriptTarget {
         /** @deprecated */
         ES3 = 0,
+        /** @deprecated */
         ES5 = 1,
         ES2015 = 2,
         ES2016 = 3,
@@ -13868,9 +13885,11 @@ declare namespace ts {
         ES2022 = 9,
         ES2023 = 10,
         ES2024 = 11,
+        ES2025 = 12,
         ESNext = 99,
         JSON = 100,
         Latest = 99,
+        LatestStandard = 12,
     }
     enum LanguageVariant {
         Standard = 0,
@@ -13946,6 +13965,7 @@ declare namespace ts {
         isTSConfigOnly?: boolean;
         isCommandLineOnly?: boolean;
         showInSimplifiedHelpView?: boolean;
+        showInHelp?: boolean;
         category?: DiagnosticMessage;
         strictFlag?: true;
         allowJsFlag?: true;
@@ -15788,7 +15808,7 @@ declare namespace ts {
         reportPrivateInBaseOfClassExpression?(propertyName: string): void;
         reportInaccessibleUniqueSymbolError?(): void;
         reportCyclicStructureError?(): void;
-        reportLikelyUnsafeImportRequiredError?(specifier: string): void;
+        reportLikelyUnsafeImportRequiredError?(specifier: string, symbolName: string | undefined): void;
         reportTruncationError?(): void;
         moduleResolverHost?: ModuleSpecifierResolutionHost & {
             getCommonSourceDirectory(): string;
@@ -18019,6 +18039,7 @@ declare namespace ts {
         Import_assertions_have_been_replaced_by_import_attributes_Use_with_instead_of_assert: DiagnosticMessage;
         This_expression_is_never_nullish: DiagnosticMessage;
         Cannot_find_module_or_type_declarations_for_side_effect_import_of_0: DiagnosticMessage;
+        The_inferred_type_of_0_cannot_be_named_without_a_reference_to_2_from_1_This_is_likely_not_portable_A_type_annotation_is_necessary: DiagnosticMessage;
         Import_declaration_0_is_using_private_name_1: DiagnosticMessage;
         Type_parameter_0_of_exported_class_has_or_is_using_private_name_1: DiagnosticMessage;
         Type_parameter_0_of_exported_interface_has_or_is_using_private_name_1: DiagnosticMessage;
@@ -18133,6 +18154,7 @@ declare namespace ts {
         The_current_host_does_not_support_the_0_option: DiagnosticMessage;
         Cannot_find_the_common_subdirectory_path_for_the_input_files: DiagnosticMessage;
         File_specification_cannot_end_in_a_recursive_directory_wildcard_Asterisk_Asterisk_Colon_0: DiagnosticMessage;
+        The_common_source_directory_of_0_is_1_The_rootDir_setting_must_be_explicitly_set_to_this_or_another_path_to_adjust_your_output_s_file_layout: DiagnosticMessage;
         Cannot_read_file_0_Colon_1: DiagnosticMessage;
         Unknown_compiler_option_0: DiagnosticMessage;
         Compiler_option_0_requires_a_value_of_type_1: DiagnosticMessage;
@@ -18656,11 +18678,12 @@ declare namespace ts {
         Check_side_effect_imports: DiagnosticMessage;
         This_operation_can_be_simplified_This_shift_is_identical_to_0_1_2: DiagnosticMessage;
         Enable_lib_replacement: DiagnosticMessage;
+        Ensure_types_are_ordered_stably_and_deterministically_across_compilations: DiagnosticMessage;
         one_of_Colon: DiagnosticMessage;
         one_or_more_Colon: DiagnosticMessage;
         type_Colon: DiagnosticMessage;
         default_Colon: DiagnosticMessage;
-        false_unless_strict_is_set: DiagnosticMessage;
+        true_unless_strict_is_false: DiagnosticMessage;
         false_unless_composite_is_set: DiagnosticMessage;
         node_modules_bower_components_jspm_packages_plus_the_value_of_outDir_if_one_is_specified: DiagnosticMessage;
         if_files_is_specified_otherwise_Asterisk_Asterisk_Slash_Asterisk: DiagnosticMessage;
@@ -19931,8 +19954,6 @@ declare namespace ts {
     function getTokenPosOfNode(node: Node, sourceFile?: SourceFileLike, includeJsDoc?: boolean): number;
     /** @internal */
     function getNonDecoratorTokenPosOfNode(node: Node, sourceFile?: SourceFileLike): number;
-    /** @internal */
-    function getNonModifierTokenPosOfNode(node: Node, sourceFile?: SourceFileLike): number;
     /** @internal */
     function getSourceTextOfNodeFromSourceFile(sourceFile: SourceFile, node: Node, includeTrivia?: boolean): string;
     /** @internal */
@@ -21269,6 +21290,13 @@ declare namespace ts {
      * can resolve to a different file.
      */
     function importSyntaxAffectsModuleResolution(options: CompilerOptions): boolean;
+    /**
+     * @internal
+     * Returns true if this option's types array includes "*"
+     */
+    function usesWildcardTypes(options: CompilerOptions): options is CompilerOptions & {
+        types: string[];
+    };
     /** @internal */
     function emitModuleKindIsNonNodeESM(moduleKind: ModuleKind): boolean;
     /** @internal */
@@ -21947,7 +21975,9 @@ declare namespace ts {
     /** @internal */
     const getUseDefineForClassFields: (compilerOptions: CompilerOptions) => boolean;
     /** @internal */
-    type StrictOptionName = "noImplicitAny" | "noImplicitThis" | "strictNullChecks" | "strictFunctionTypes" | "strictBindCallApply" | "strictPropertyInitialization" | "strictBuiltinIteratorReturn" | "alwaysStrict" | "useUnknownInCatchVariables";
+    const getAlwaysStrict: (compilerOptions: CompilerOptions) => boolean;
+    /** @internal */
+    type StrictOptionName = "noImplicitAny" | "noImplicitThis" | "strictNullChecks" | "strictFunctionTypes" | "strictBindCallApply" | "strictPropertyInitialization" | "strictBuiltinIteratorReturn" | "useUnknownInCatchVariables";
     /** @internal */
     interface SymlinkedDirectory {
         /**
@@ -23309,7 +23339,7 @@ declare namespace ts {
      * Given a set of options, returns the set of type directive names
      *   that should be included for this program automatically.
      * This list could either come from the config file,
-     *   or from enumerating the types root + initial secondary types lookup location.
+     *   and/or from enumerating the types root + initial secondary types lookup location given "*" compat wildcard.
      * More type directives might appear in the program later as a result of loading actual source files;
      *   this list is only the set of defaults that are implicitly included.
      */
@@ -23604,6 +23634,7 @@ declare namespace ts {
         HasLocals = 32,
         IsInterface = 64,
         IsObjectLiteralOrClassExpressionMethodOrAccessor = 128,
+        PropagatesThisKeyword = 256,
     }
     /** @internal */
     function createGetSymbolWalker(getRestTypeOfSignature: (sig: Signature) => Type, getTypePredicateOfSignature: (sig: Signature) => TypePredicate | undefined, getReturnTypeOfSignature: (sig: Signature) => Type, getBaseTypes: (type: InterfaceType) => BaseType[], resolveStructuredTypeMembers: (type: ObjectType) => ResolvedType, getTypeOfSymbol: (sym: Symbol) => Type, getResolvedSymbol: (node: Identifier) => Symbol, getConstraintOfTypeParameter: (typeParameter: TypeParameter) => Type | undefined, getFirstIdentifier: (node: EntityNameOrEntityNameExpression) => Identifier, getTypeArguments: (type: TypeReference) => readonly Type[]): (accept?: (symbol: Symbol) => boolean) => SymbolWalker;
@@ -24354,6 +24385,8 @@ declare namespace ts {
     function getOutputJSFileNameWorker(inputFileName: string, options: CompilerOptions, ignoreCase: boolean, getCommonSourceDirectory: () => string): string;
     /** @internal */
     function getCommonSourceDirectory(options: CompilerOptions, emittedFiles: () => readonly string[], currentDirectory: string, getCanonicalFileName: GetCanonicalFileName, checkSourceFilesBelongToPath?: (commonSourceDirectory: string) => void): string;
+    /** @internal */
+    function getComputedCommonSourceDirectory(emittedFiles: readonly string[], currentDirectory: string, getCanonicalFileName: GetCanonicalFileName): string;
     /** @internal */
     function getCommonSourceDirectoryOfConfig({ options, fileNames }: ParsedCommandLine, ignoreCase: boolean): string;
     /** @internal */
@@ -25503,6 +25536,8 @@ declare namespace ts {
         getCurrentProgram(): Program | undefined;
         fileIsOpen(filePath: Path): boolean;
         onDiscoveredSymlink?(): void;
+        skipWatchingFailedLookups?(path: Path): boolean | undefined;
+        skipWatchingTypeRoots?(): boolean | undefined;
         beforeResolveSingleModuleNameWithoutWatching?(moduleResolutionCache: ModuleResolutionCache): any;
         afterResolveSingleModuleNameWithoutWatching?(moduleResolutionCache: ModuleResolutionCache, moduleName: string, containingFile: string, result: ResolvedModuleWithFailedLookupLocations, data: any): any;
     }

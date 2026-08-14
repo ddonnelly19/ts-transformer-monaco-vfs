@@ -1,22 +1,25 @@
-import { printNode } from "ts-morph";
 import ts from "typescript";
-import { getModifiers, validProperty } from "../../utils";
+import { getAllLeadingComments, getModifiers, makeJsDocText, validProperty } from "../utils";
+
 
 function isNodeExtend(exprRight?: ts.Node): exprRight is ts.CallExpression {
-	return !!exprRight && ts.isCallExpression(exprRight) && (printNode(exprRight.expression, { "removeComments": true }) == "Object.extendsObject" || printNode(exprRight.expression, { "removeComments": true }) == "Object.extend") && exprRight.arguments.length == 2;
+	return !!exprRight &&
+		ts.isCallExpression(exprRight) &&
+		ts.isPropertyAccessExpression(exprRight.expression) &&
+		ts.isIdentifier(exprRight.expression.expression) &&
+		exprRight.expression.expression.text == "Object" &&
+		((exprRight.expression.name.text == "extendsObject" ||
+			exprRight.expression.name.text == "extends") && exprRight.arguments.length == 2);
 }
 
-export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (sourceFile) => {
+const fixPrototype = (program: ts.Program) => (context: ts.TransformationContext) => (sourceFile: ts.SourceFile) => {
 	const factory = context.factory;
 	const visitor: ts.Visitor = (node) => {
-		if (!node) 
+		if (!node)
 			return undefined;
 
 		// "prototype"
-		if (
-			ts.isExpressionStatement(node) &&
-			ts.isBinaryExpression(node.expression)
-		) {
+		if (ts.isExpressionStatement(node) && ts.isBinaryExpression(node.expression)) {
 			var expr = node.expression;
 			if (
 				expr.operatorToken.kind == ts.SyntaxKind.EqualsToken &&
@@ -25,10 +28,7 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 			) {
 				let exprLeft = expr.left;
 				let exprRight = expr.right;
-				if (
-					isNodeExtend(exprRight) &&
-					ts.isObjectLiteralExpression(exprRight.arguments[1])
-				) {
+				if (isNodeExtend(exprRight) && ts.isObjectLiteralExpression(exprRight.arguments[1]!)) {
 					return ts.visitNodes(
 						factory.createNodeArray([
 							// Object.extendsObject
@@ -39,7 +39,7 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 									factory.createCallExpression(
 										exprRight.expression,
 										undefined,
-										[exprRight.arguments[0], exprLeft]
+										[exprRight.arguments[0]!, exprLeft]
 									)
 								)
 							),
@@ -55,15 +55,13 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 						visitor
 					);
 				}
+
 				if (ts.isObjectLiteralExpression(exprRight!)) {
 					if (exprRight.properties.length == 0) {
 					} else {
 						let props = exprRight.properties
-							.map((propNode) => {
-								if (
-									ts.isPropertyAssignment(propNode) ||
-									ts.isMethodDeclaration(propNode)
-								) {
+							.flatMap((propNode) => {
+								if (ts.isPropertyAssignment(propNode) || ts.isMethodDeclaration(propNode)) {
 									var init = ts.isPropertyAssignment(propNode)
 										? propNode.initializer
 										: factory.createFunctionExpression(
@@ -75,18 +73,13 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 											propNode.type,
 											propNode.body || factory.createBlock([])
 										);
-									var ret: (ts.ExpressionStatement | ts.JSDoc)[] = [];
-									var jsDoc = (propNode as any).jsDoc;
-									if (!!jsDoc) {
-										if (ts.isJSDoc(jsDoc)) ret.push(jsDoc);
-										else ret = ret.concat(jsDoc);
-									} else {
-									}
-									if (
-										(ts.isStringLiteral(propNode.name) ||
-											ts.isMemberName(propNode.name)) &&
-										propNode.name.text.match(validProperty)
-									) {
+									var ret: (ts.ExpressionStatement | ts.JSDoc | ts.JSDocTag)[] = [];
+									/*	var jsDoc = ts.getJSDocCommentsAndTags(propNode);
+										if (!!jsDoc) {
+											ret = ret.concat([...ts.getJSDocCommentsAndTags(propNode)])
+										} else {
+										}*/
+									if ((ts.isStringLiteral(propNode.name) || ts.isMemberName(propNode.name)) && propNode.name.text.match(validProperty)) {
 										let assn = factory.createAssignment(
 											factory.createPropertyAccessExpression(
 												exprLeft,
@@ -94,13 +87,17 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 											),
 											init
 										);
-										ret.push(factory.createExpressionStatement(assn));
+
+										var stmt = factory.createExpressionStatement(assn);
+										var comments = getAllLeadingComments(propNode);
+										if (comments.length > 0)
+											ts.addSyntheticLeadingComment(stmt, ts.SyntaxKind.MultiLineCommentTrivia, makeJsDocText(comments), true);
+										ret.push(stmt);
 									}
 									return ret.filter((a) => !!a);
 								}
 								return [];
 							})
-							.reduce((a, b) => a.concat(b), [])
 							.filter((expr) => !!expr);
 						return ts.visitNodes(factory.createNodeArray(props), visitor).filter((a) => !!a);
 					}
@@ -111,3 +108,5 @@ export const fixPrototype: ts.TransformerFactory<ts.SourceFile> = (context) => (
 	};
 	return ts.visitEachChild(sourceFile, visitor, context);
 }
+
+export default fixPrototype;

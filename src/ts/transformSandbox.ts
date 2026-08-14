@@ -1,98 +1,169 @@
 import * as tsvfs from "@typescript/vfs"
-import ts from 'typescript'
-import { transpileCode } from "./utils"
+import ts from "typescript"
+import { getASTFactory } from "./tsFactory"
+import { getAstStructure } from "../ts-morph/tsmorphUtils"
+import { sourceFileAST } from "./SymbolSerializer"
 
+/**
+ * Signature expected of the default export of a user-authored transform
+ * script loaded at runtime.
+ *
+ * Receives the live `program` and `languageServiceHost` and must return a
+ * `ts.TransformerFactory` that will be applied to each source file.
+ */
+type TransformerFn = (
+	{
+		program,
+		languageServiceHost
+	}: {
+		program?: ts.Program;
+		languageServiceHost?: ts.LanguageServiceHost,
+	}
+) => ts.TransformerFactory<ts.SourceFile>
+
+interface RunTransformOutput {
+	/** The transformed TypeScript source code. */
+	transformedTs: string;
+	/** The emitted JavaScript code. */
+	emittedJs: string;
+	/** The generated TypeScript declaration file (.d.ts) content. */
+	dts: string;
+	/** The structure representation of the transformed code. */
+	structure: string
+	/** Array of errors encountered during transformation, each containing a message and error details. */
+	errors: { message: string; error: any }[];
+	/** Array of error positions with line, column, and message information. */
+	errorPositions: { line: number; column: number; message: string }[];
+	/** Runtime debug lines from transformer module loading. */
+	debugLogs: string[];
+	/** The TypeScript compiler options used for the transformation. */
+	compilerOptions: ts.CompilerOptions
+}
+
+/**
+ * Input parameters for running a TypeScript transformer.
+ */
+interface RunTransformInput {
+	/** The name of the input file being transformed. */
+	inputFileName: string,
+	/** The source code to be transformed. */
+	source: string
+	/** The file path to the transformer module. */
+	transformerPath: string
+	/** Optional TypeScript compiler options to use during transformation. */
+	compilerOptions?: ts.CompilerOptions
+}
+
+/**
+ * Compiles and runs a user-authored TypeScript transformer against the given
+ * source code inside an in-memory Virtual File System.
+ *
+ * Steps performed:
+ * 1. Parses `compilerOptions` through `ts.parseJsonConfigFileContent`.
+ * 2. Builds a VFS pre-populated with TypeScript standard library files (from CDN).
+ * 3. Evaluates the transformer from `./transformer` (the runtime entry point).
+ * 4. Emits the transformed source, JavaScript output, and `.d.ts` declarations.
+ * 5. Generates an AST structure summary via `getAstStructure`.
+ *
+ */
 export async function runTransform({
 	inputFileName,
 	source,
-	transformCode,
+	transformerPath,
 	compilerOptions = {},
-}: {
-	inputFileName: string,
-	source: string
-	transformCode: string
-	compilerOptions?: Partial<ts.CompilerOptions>
-}) {
+}: RunTransformInput): Promise<RunTransformOutput> {
 	const errors: { message: string; error: any }[] = []
 	const errorPositions: { line: number; column: number; message: string }[] = []
+	const debugLogs: string[] = []
+
+	var parsed = ts.parseJsonConfigFileContent(
+		{
+			compilerOptions,
+			files: []
+		},
+		// we don't do any file lookups - host and base folders should not be used
+		{} as ts.ParseConfigHost,
+		"");
 
 	const options: ts.CompilerOptions = {
-		...compilerOptions,
-		target: ts.ScriptTarget.ES2024,
-		module: ts.ModuleKind.ESNext,
+		...parsed.options,
+		//target: ts.ScriptTarget.ES2024,
+		//module: ts.ModuleKind.ESNext,
 		declaration: true,
 		emitDeclarationOnly: false,
 		newLine: ts.NewLineKind.LineFeed,
-		outDir: "dist"
+		outDir: "dist",
+		"allowJs": true,
+		"checkJs": true,
+		"allowNonTsExtensions": true,
+		"allowSyntheticDefaultImports": true,
+		"paths": {
+			"typescript": [
+				"file:///typescript.d.ts"
+			]
+		}
 	}
+	
+	console.info(`Transforming with ${transformerPath}`);
 
 	// Prepare VFS with libs from CDN
 	const fsMap = await tsvfs.createDefaultMapFromCDN(options, ts.version, true, ts);
-	//const inputFileName = 'input.js'
 	fsMap.set(inputFileName, source)
 	var system = tsvfs.createSystem(fsMap);
-	//var env = tsvfs.createVirtualTypeScriptEnvironment(tsvfs.createSystem(fsMap), [inputFileName], ts, options)
 
-	// 1) Compile transformCode (TypeScript) to CommonJS JavaScript
-	let compiledTransformJS = transpileCode(transformCode)
-
-	let transformerFactory: (
+	let transformerFactory = async (
+		transformer: TransformerFn,
 		ts: typeof import("typescript"),
 		system: import("typescript").System,
 		compilerHost: import("typescript").CompilerHost,
 		languageServiceHost: import("typescript").LanguageServiceHost,
 		options: import("typescript").CompilerOptions,
 		inputFileName: string
-	) => void = (await import("./transformer")).default
+	) => {
+		var program = ts.createProgram([inputFileName], options, compilerHost);
+		ts.transform(
+			//program.getSourceFile(inputFileName)!,
+			ts.createSourceFile(inputFileName, system.readFile(inputFileName)!, ts.ScriptTarget.ESNext, true),
+			[
+				transformer({ program, languageServiceHost })
+			]
+		)
+			.transformed
+			.forEach(sf => {
+				var txt = ts.createPrinter().printFile(sf);
+				compilerHost.writeFile(sf.fileName, txt, true)
+			});
+	};
 
-
-	/*try {
-		const moduleObj = { exports: {} as any }
-		const fn = new Function('ts', 'module', 'exports', compiledTransformJS)
-		fn(ts, moduleObj, moduleObj.exports)
-
-		// support both `export default` and `module.exports =`
-		transformerFactory = moduleObj.exports?.default ?? moduleObj.exports
-
-		if (typeof transformerFactory !== 'function') {
-			throw new Error('Transform script must export a function (context) => (sourceFile) => ...')
-		}
-	} catch (e: any) {
-		console.error(e);
-		errors.push({
-			message: 'Failed to evaluate compiled transform script:',
-			error: e
-		})
-		return { transformedTs: '', emittedJs: '', dts: '', errors, errorPositions }
-	}*/
-
-	
 	const vCh = tsvfs.createVirtualCompilerHost(system, options, ts);
 	const vLsh = tsvfs.createVirtualLanguageServiceHost(system, [inputFileName], options, ts);
 
-
-	// Create Program on VFS (unchanged)
-
-	//const tr = ts.transform(sf, [transformerFactory])
-	transformerFactory(
-		ts, 
-		system, 
-		vCh.compilerHost, 
-		vLsh.languageServiceHost, 
-		options, 
+	// Dynamic imports are cached by URL; add a run-specific query to always load the latest edited transformer.
+	const importPath = `${transformerPath}${transformerPath.includes('?') ? '&' : '?'}t=${Date.now()}`
+	debugLogs.push(`Loading transformer module: ${importPath}`)
+	console.debug('Loading transformer module', { transformerPath, importPath })
+	const transformerModule = await import(/* @vite-ignore */ importPath)
+	debugLogs.push(`Loaded transformer exports: ${Object.keys(transformerModule).join(', ') || '(none)'}`)
+	console.debug('Loaded transformer module exports', Object.keys(transformerModule))
+	if (typeof transformerModule.default !== 'function') {
+		throw new Error(`Transformer module at ${transformerPath} must have a default-exported function`)
+	}
+	var transformerFn = transformerModule.default as TransformerFn
+	await transformerFactory(
+		transformerFn,
+		ts,
+		system,
+		vCh.compilerHost,
+		vLsh.languageServiceHost,
+		options,
 		inputFileName
 	);
 
 	var env = tsvfs.createVirtualTypeScriptEnvironment(system, [inputFileName], ts, options);
 	var sf = env.getSourceFile(inputFileName);
 	var transformedTsText = env.sys.readFile(inputFileName)!
-	//const transformedSf = tr.transformed[0] as ts.SourceFile
 
-	var program = ts.createProgram({
-		rootNames: [inputFileName],
-		options,
-		host: vCh.compilerHost
-	});
+	var program = ts.createProgram([inputFileName], options, vCh.compilerHost);
 
 	/*const pre = ts.getPreEmitDiagnostics(program)
 	for (const d of pre) {
@@ -134,8 +205,16 @@ export async function runTransform({
 		}
 	}
 
-	const emittedJs = env.sys.readFile('dist/input.js') || ''
-	const dts = env.sys.readFile('dist/input.d.ts') || ''
 	env.languageService.dispose();
-	return { transformedTs: transformedTsText, emittedJs, dts, errors, errorPositions }
+
+	return {
+		transformedTs: transformedTsText,
+		emittedJs: env.sys.readFile('dist/input.js') || '',
+		dts: env.sys.readFile('dist/input.d.ts') || '',
+		structure: sourceFileAST(sf!),
+		errors,
+		errorPositions,
+		debugLogs,
+		compilerOptions
+	}
 }

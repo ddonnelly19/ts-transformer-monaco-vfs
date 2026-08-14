@@ -1,0 +1,398 @@
+/* Custom Script Manager Styles */
+
+.custom-script-manager-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.custom-script-manager-modal .modal-backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(0, 0, 0, 0.5);
+	cursor: pointer;
+}
+
+.custom-script-manager-modal .modal-content {
+	position: relative;
+	z-index: 1001;
+	background: #1e1e1e;
+	border-radius: 8px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+	display: flex;
+	flex-direction: column;
+	width: 90%;
+	max-width: 900px;
+	height: 80vh;
+	max-height: 600px;
+	color: #e0e0e0;
+}
+
+.custom-script-manager-modal .modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 1.5rem;
+	border-bottom: 1px solid #404040;
+}
+
+.custom-script-manager-modal .modal-header h2 {
+	margin: 0;
+	font-size: 1.5rem;
+	font-weight: 600;
+}
+
+.custom-script-manager-modal .close-btn {
+	background: none;
+	border: none;
+	color: #999;
+	font-size: 1.5rem;
+	cursor: pointer;
+	padding: 0;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	transition: background-color 0.2s;
+}
+
+.custom-script-manager-modal .close-btn:hover {
+	background-color: #303030;
+	color: #fff;
+}
+
+.custom-script-manager-modal .modal-body {
+	flex: 1;
+	display: flex;
+	overflow: hidden;
+}
+
+.custom-script-manager-modal .scripts-list-section {
+	flex: 0 0 40%;
+	display: flex;
+	flex-direction: column;
+	border-right: 1px solid #404040;
+	overflow: hidden;
+}
+
+.custom-script-manager-modal .controls {
+	display: flex;
+	gap: 0.5rem;
+	padding: 1rem;
+	border-bottom: 1px solid #404040;
+}
+
+.custom-script-manager-modal .search-input {
+	flex: 1;
+	padding: 0.5rem;
+	background: #2d2d2d;
+	border: 1px solid #404040;
+	color: #e0e0e0;
+	border-radius: 4px;
+}
+
+.custom-script-manager-modal .search-input:focus {
+	outline: none;
+	border-color: #007acc;
+}
+
+.custom-script-manager-modal .controls button {
+	padding: 0.5rem 1rem;
+	background: #0e639c;
+	color: #fff;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.875rem;
+	transition: background-color 0.2s;
+}
+
+.custom-script-manager-modal .controls button:hover {
+	background: #1177bb;
+}
+
+.custom-script-manager-modal .scripts-list {
+	flex: 1;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+}
+
+.custom-script-manager-modal .script-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid #2d2d2d;
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+.custom-script-manager-modal .script-item:hover {
+	background-color: #2d2d2d;
+}
+
+.custom-script-manager-modal .script-item.selected {
+	background-color: #0e639c;
+}
+
+.custom-script-manager-modal .script-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.custom-script-manager-modal .script-name {
+	font-weight: 600;
+	margin-bottom: 0.25rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.custom-script-manager-modal .script-description {
+	font-size: 0.75rem;
+	color: #999;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.custom-script-manager-modal .script-meta {
+	font-size: 0.7rem;
+	color: #666;
+	margin-top: 0.25rem;
+}
+
+.custom-script-manager-modal .script-actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-left: 1rem;
+}
+
+.custom-script-manager-modal .script-actions button {
+	background: none;
+	border: none;
+	color: #999;
+	cursor: pointer;
+	font-size: 1rem;
+	padding: 0.25rem 0.5rem;
+	border-radius: 4px;
+	transition: all 0.2s;
+}
+
+.custom-script-manager-modal .script-actions button:hover {
+	background-color: #404040;
+	color: #fff;
+}
+
+.custom-script-manager-modal .script-preview-section {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.custom-script-manager-modal .preview-header {
+	padding: 1rem;
+	border-bottom: 1px solid #404040;
+}
+
+.custom-script-manager-modal .preview-header h3 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.custom-script-manager-modal .script-preview {
+	flex: 1;
+	overflow: auto;
+	padding: 1rem;
+	margin: 0;
+	background: #1a1a1a;
+	color: #d4d4d4;
+	font-size: 0.85rem;
+	line-height: 1.5;
+	font-family: 'Courier New', monospace;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* Dialog Styles */
+.custom-script-manager-modal .import-dialog,
+.custom-script-manager-modal .create-dialog {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 1002;
+	background: #2d2d2d;
+	border-radius: 8px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+	border: 1px solid #404040;
+	min-width: 300px;
+}
+
+.custom-script-manager-modal .dialog-content {
+	padding: 1.5rem;
+}
+
+.custom-script-manager-modal .dialog-content h3 {
+	margin: 0 0 1rem 0;
+	font-size: 1.1rem;
+}
+
+.custom-script-manager-modal .import-options {
+	display: flex;
+	gap: 1rem;
+	margin-bottom: 1.5rem;
+}
+
+.custom-script-manager-modal .file-input-label,
+.custom-script-manager-modal .import-options button {
+	flex: 1;
+	padding: 0.75rem 1rem;
+	background: #0e639c;
+	color: #fff;
+	border: 1px solid #0e639c;
+	border-radius: 4px;
+	cursor: pointer;
+	text-align: center;
+	transition: background-color 0.2s;
+	font-size: 0.875rem;
+}
+
+.custom-script-manager-modal .file-input-label:hover,
+.custom-script-manager-modal .import-options button:hover {
+	background: #1177bb;
+}
+
+.custom-script-manager-modal .name-input {
+	width: 100%;
+	padding: 0.75rem;
+	margin-bottom: 1.5rem;
+	background: #1a1a1a;
+	border: 1px solid #404040;
+	color: #e0e0e0;
+	border-radius: 4px;
+	box-sizing: border-box;
+}
+
+.custom-script-manager-modal .name-input:focus {
+	outline: none;
+	border-color: #007acc;
+}
+
+.custom-script-manager-modal .dialog-actions {
+	display: flex;
+	gap: 1rem;
+	justify-content: flex-end;
+}
+
+.custom-script-manager-modal .dialog-actions button {
+	padding: 0.5rem 1rem;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.875rem;
+}
+
+.custom-script-manager-modal .dialog-actions button:not(.cancel-btn) {
+	background: #0e639c;
+	color: #fff;
+	transition: background-color 0.2s;
+}
+
+.custom-script-manager-modal .dialog-actions button:not(.cancel-btn):hover {
+	background: #1177bb;
+}
+
+.custom-script-manager-modal .error-message {
+	background: #5f1f1f;
+	color: #ff6b6b;
+	padding: 0.75rem;
+	border-radius: 4px;
+	margin-bottom: 1rem;
+	font-size: 0.875rem;
+	border: 1px solid #7a3030;
+}
+
+.custom-script-manager-modal .cancel-btn {
+	background: #404040;
+	color: #e0e0e0;
+	border: none;
+	border-radius: 4px;
+	padding: 0.5rem 1rem;
+	cursor: pointer;
+	font-size: 0.875rem;
+	transition: background-color 0.2s;
+}
+
+.custom-script-manager-modal .cancel-btn:hover {
+	background: #505050;
+}
+
+.custom-script-manager-modal .modal-footer {
+	display: flex;
+	gap: 1rem;
+	padding: 1rem 1.5rem;
+	border-top: 1px solid #404040;
+	justify-content: flex-end;
+}
+
+.custom-script-manager-modal .modal-footer button {
+	padding: 0.75rem 1.5rem;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.875rem;
+	transition: all 0.2s;
+}
+
+.custom-script-manager-modal .load-btn {
+	background: #107c10;
+	color: #fff;
+}
+
+.custom-script-manager-modal .load-btn:hover:not(:disabled) {
+	background: #11a511;
+}
+
+.custom-script-manager-modal .load-btn:disabled {
+	background: #404040;
+	color: #999;
+	cursor: not-allowed;
+}
+
+/* Scrollbar styling */
+.custom-script-manager-modal .scripts-list::-webkit-scrollbar,
+.custom-script-manager-modal .script-preview::-webkit-scrollbar {
+	width: 8px;
+}
+
+.custom-script-manager-modal .scripts-list::-webkit-scrollbar-track,
+.custom-script-manager-modal .script-preview::-webkit-scrollbar-track {
+	background: #1a1a1a;
+}
+
+.custom-script-manager-modal .scripts-list::-webkit-scrollbar-thumb,
+.custom-script-manager-modal .script-preview::-webkit-scrollbar-thumb {
+	background: #404040;
+	border-radius: 4px;
+}
+
+.custom-script-manager-modal .scripts-list::-webkit-scrollbar-thumb:hover,
+.custom-script-manager-modal .script-preview::-webkit-scrollbar-thumb:hover {
+	background: #505050;
+}

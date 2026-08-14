@@ -38,7 +38,7 @@ function main() {
 	ensureDir(workRoot);
 
 	const repoDir = join(workRoot, "TS"); // keep it short: "TS"
-	const outSingle = resolve(cwd, dtsName);
+	const outSingle = resolve(cwd, "@types", dtsName);
 
 	console.log(`Working directory: ${workRoot}`);
 

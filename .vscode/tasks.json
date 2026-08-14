@@ -2,53 +2,31 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Dev (Vite)",
 			"type": "npm",
 			"script": "dev",
-			"isBackground": true,
+			"group": "build",
 			"problemMatcher": {
-				"owner": "vite",
-				"fileLocation": [
-					"relative",
-					"${workspaceFolder}"
-				],
 				"pattern": {
-					"regexp": ".",
+					"regexp": "^.*ready in.*ms.*$",
 					"file": 1,
 					"location": 2,
 					"message": 3
 				},
 				"background": {
 					"activeOnStart": true,
-					"beginsPattern": "Local:\\s*https?://localhost:\\d+/?",
-					"endsPattern": "###__NEVER__ENDS__###"
+					"beginsPattern": "^.*npm run dev.*$",
+					"endsPattern": "^.*ready in.*ms.*$"
 				}
-			}
-		},
-		{
-			"type": "npm",
-			"script": "dev",
-			"group": "build",
-			"problemMatcher": [],
+			},
 			"label": "npm: dev",
 			"isBackground": true
 		},
 		{
-			"label": "Generate TypeScript internal .d.ts",
-			"type": "shell",
-			"command": "node",
-			"args": [
-				"${workspaceFolder}/generate-internal-dts.js"
-			],
-			"options": {
-				"cwd": "${workspaceFolder}"
-			},
+			"type": "npm",
+			"script": "generate:internal-dts",
+			"group": "build",
 			"problemMatcher": [],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
-			"detail": "Long-path safe generation of a single internal TypeScript .d.ts"
+			"label": "npm: generate:internal-dts"
 		}
 	]
 }

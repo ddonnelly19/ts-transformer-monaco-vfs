@@ -1,10 +1,10 @@
 import ts from "typescript";
-import { isNodeAssignableToString, createStringConcat } from "../../utils";
+import { createStringConcat, isNodeAssignableToString } from "../utils";
 
 
-const transformStringConcat: ts.TransformerFactory<ts.SourceFile> = (context) => (sourceFile) => {
+const transformStringConcat: (program: ts.Program) => ts.TransformerFactory<ts.SourceFile> = (program) => (context) => (sourceFile) => {
 	const factory = context.factory;
-	var program = ts.createProgram([sourceFile.fileName], context.getCompilerOptions(), ts.createCompilerHost(context.getCompilerOptions()));
+//	var program = ts.createProgram([sourceFile.fileName], context.getCompilerOptions(), ts.createCompilerHost(context.getCompilerOptions()));
 	const typeChecker = program.getTypeChecker();
 	var visitor: ts.Visitor = (node) => {
 		if (!node)
@@ -40,4 +40,8 @@ const transformStringConcat: ts.TransformerFactory<ts.SourceFile> = (context) =>
 	return ts.visitEachChild(sourceFile, visitor, context);
 
 }
-export { transformStringConcat }
+export default  ({ host, program, sourceFile }: {
+    host: import("typescript").CompilerHost;
+    program: import("typescript").Program;
+    sourceFile: import("typescript").SourceFile;
+}) => transformStringConcat(program);

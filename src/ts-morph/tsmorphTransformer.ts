@@ -1,9 +1,28 @@
 import { Project, SourceFile, Node, FileTextChanges, FormatCodeSettings, UserPreferences } from "ts-morph";
 import ts from "typescript";
+/**
+ * Default transformer entry point consumed by both {@link runTransform} sandboxes.
+ *
+ * Receives the active ts-morph `Project` and applies all configured refactors
+ * to the source files within it, mutating the project in place.
+ *
+ * @param project - The ts-morph `Project` containing the files to transform.
+ */
 export default (project: Project) => {
 	var formatContext: FormatCodeSettings = {};
 	var preferences: UserPreferences | undefined = {};
 
+	/**
+	 * Applies a batch of language-service file-text changes to the project and
+	 * returns the updated `SourceFile` objects.
+	 *
+	 * Empty statements left behind by refactors are removed and the affected
+	 * source files are refreshed.
+	 *
+	 * @param project - The ts-morph `Project` to update.
+	 * @param changes - The file-text changes returned by a language-service edit.
+	 * @returns Array of updated (and non-null) `SourceFile` instances.
+	 */
 	function applyFileChanges(project: Project, changes: FileTextChanges[]) {
 		return Array.from(
 			changes.reduce<Set<string>>((state, curr) => {
@@ -24,6 +43,17 @@ export default (project: Project) => {
 			});
 	}
 	
+	/**
+	 * Iterates all descendant nodes of the given source file, queries the
+	 * language service for applicable refactors, and applies the first matching
+	 * set of edits.
+	 *
+	 * @param project - The ts-morph `Project` owning the file.
+	 * @param sourceFilePath - VFS path of the file to refactor.
+	 * @param kind - Optional refactor kind prefix filter (e.g. `"refactor.rewrite"`).
+	 * @param name - Optional exact refactor name filter.
+	 * @returns The (possibly modified) `SourceFile`.
+	 */
 	function applyRefactors(
 		project: Project,
 		sourceFilePath: string,

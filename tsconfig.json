@@ -7,24 +7,34 @@
 			"DOM",
 			"WebWorker"
 		],
+		"noEmit": true,
 		"jsx": "react-jsx",
 		"moduleResolution": "Bundler",
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
-		"sourceMap": true,
-		"allowSyntheticDefaultImports": true,
+		"sourceMap": false,
+		"allowSyntheticDefaultImports": true,		
+		"typeRoots": [
+			"@types"
+		],
 		"paths": {
 			"@ts-morph/common": [
-				"./tsmorph.d.ts"	
+				"./@types/tsmorph.d.ts"	
 			],
 			"typescript": [
-				"./typescript.internal.d.ts"
+				"./@types/typescript.internal.d.ts"
 			]
 		}
 	},
 	"include": [
-		"src"
+		"./**/*",
 	],
+	"exclude": [
+		"dist",
+		"node_modules",
+		"**/node_modules/**",
+		//"storage/**/*"
+	]
 }

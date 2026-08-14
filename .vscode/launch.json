@@ -44,7 +44,7 @@
 				"Launch Microsoft Edge in headless mode",
 				"Open Edge DevTools"
 			],
-			"preLaunchTask": "Dev (Vite)"
+			"preLaunchTask": "npm: dev"
 		},
 		{
 			"name": "Launch Edge and attach DevTools",
@@ -52,7 +52,7 @@
 				"Launch Microsoft Edge",
 				"Open Edge DevTools"
 			],
-			"preLaunchTask": "Dev (Vite)"
+			"preLaunchTask": "npm: dev"
 		}
 	]
 }
