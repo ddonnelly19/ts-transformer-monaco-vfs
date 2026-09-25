@@ -14,8 +14,8 @@
 				},
 				"background": {
 					"activeOnStart": true,
-					"beginsPattern": "^.*npm run dev.*$",
-					"endsPattern": "^.*ready in.*ms.*$"
+					"beginsPattern": "^.*$",
+					"endsPattern": "^.*(ready in|Local:).*$"
 				}
 			},
 			"label": "npm: dev",

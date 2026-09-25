@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { createStringConcat, isNodeAssignableToString } from "../utils";
+import { createStringConcat, isNodeAssignableToString } from "./utils";
 
 
 const transformStringConcat: (program: ts.Program) => ts.TransformerFactory<ts.SourceFile> = (program) => (context) => (sourceFile) => {

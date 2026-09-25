@@ -70,7 +70,7 @@ const removeAnyType = (program: ts.Program) => (context: ts.TransformationContex
 				)
 			}*/
 
-			if (false && ts.hasJSDocNodes(node)) {
+			if (ts.hasJSDocNodes(node)) {
 				var docs1 = ts.getJSDocCommentsAndTags(node)
 				var docs = ts.visitNodes(factory.createNodeArray(docs1), visitor)
 					.filter(d => ts.isJSDoc(d) || ts.isJSDocTag(d));
@@ -91,4 +91,4 @@ const removeAnyType = (program: ts.Program) => (context: ts.TransformationContex
 	};
 };
 
-export default ({program}) => removeAnyType(program);
+export default ({program}: any) => removeAnyType(program);

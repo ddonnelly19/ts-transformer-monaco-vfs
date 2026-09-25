@@ -1,6 +1,6 @@
 import ts from "typescript";
-import { getFlagName, getFlagNames, isNode, printNode, stableStringify } from "./utils";
-import { createTSMorphSourceFile } from "../ts-morph/tsmorphUtils";
+import { getFlagName, getFlagNames, isNode, isNotEmpty, stableStringify } from "./utils";
+import { printNode } from "ts-morph";
 
 interface SymbolJSON {
 	flags: ts.SymbolFlags;
@@ -83,7 +83,9 @@ function setToJSON<T>(s: Set<T>) {
  */
 export function isTsSymbol(value: unknown): value is ts.Symbol {
 	if (value == null || typeof value !== "object") return false;
-
+	
+	if (value.constructor.name == "SymbolObject")
+		return true;
 	const v = value as Partial<ts.Symbol> & Record<string, unknown>;
 
 	// `flags` is required on ts.Symbol and is a number (enum)
@@ -95,9 +97,29 @@ export function isTsSymbol(value: unknown): value is ts.Symbol {
 
 	// At least one of these usually exists in real Symbols.
 	// (They are optional in the type, but commonly present.)
-	const hasDeclarations = Array.isArray(v.declarations) || typeof (v as any).valueDeclaration === "object" || typeof (v as any).members === "object" || typeof (v as any).exports === "object";
+	const hasDeclarations =
+		Array.isArray(v.declarations) || typeof (v as any).valueDeclaration === "object" || typeof (v as any).members === "object" || typeof (v as any).exports === "object";
 
 	return hasDeclarations;
+}
+
+/**
+ * Type guard to check if an unknown object is a ts.Type
+ */
+export function isTsType(obj: unknown): obj is ts.Type {
+	return (obj as any).constructor.name == "TypeObject";
+	/* || (
+		typeof obj === "object" &&
+		obj !== null &&
+		!("kind" in obj) &&
+		"id" in obj && 
+		typeof obj.id === "number" &&
+		"flags" in obj &&
+		typeof obj.flags === "number" 
+		// Differentiate from ts.Node (which uses .kind) and ts.Symbol (which uses .flags but has different methods)
+		//typeof (obj as any).getApparentType === "function" &&
+		//typeof (obj as any).getConstraint === "function"
+	);*/
 }
 
 /**
@@ -116,7 +138,7 @@ export function isTsSymbol(value: unknown): value is ts.Symbol {
  * @param obj - The value being stringified.
  * @returns A JSON-safe representation of `obj`.
  */
-function createSymbolReplacer() {
+function createSymbolReplacer(checker?: ts.TypeChecker) {
 	const seen = new WeakSet<object>();
 
 	return function symbolReplacer(key: any, obj: any) {
@@ -132,9 +154,24 @@ function createSymbolReplacer() {
 			if (isNode(obj)) {
 				return {
 					kind: getFlagName(obj.kind, ts.SyntaxKind),
+					flags: getFlagName(obj.flags, ts.NodeFlags),
+					fileName: obj.getSourceFile().fileName,
 					pos: obj.pos,
 					end: obj.end,
-					text: printNode(obj)
+					text: printNode(obj),
+				};
+			}
+			
+			if(isTsType(obj)) {		
+				return {
+					...obj,
+					flags: getFlagName(obj.flags, ts.TypeFlags),
+					symbol: undefined,
+					checker: undefined,
+					id: undefined,
+					objectFlags: getFlagNames((obj as any).objectFlags, ts.ObjectFlags, ts.ObjectFlags.None),
+					freshType: undefined
+								
 				}
 			}
 
@@ -144,12 +181,11 @@ function createSymbolReplacer() {
 						name: obj.name,
 						escapedName: obj.escapedName,
 						parent: undefined,
-						flags: getFlagNames(obj.flags, ts.SymbolFlags, ts.SymbolFlags.None),						
+						flags: getFlagNames(obj.flags, ts.SymbolFlags, ts.SymbolFlags.None),
 						//id: obj.id,
 						//mergeId: obj.mergeId,
 						//constEnumOnlyModule: !!obj.constEnumOnlyModule,
-						
-						
+						type: checker?.getTypeOfSymbol(obj),
 						members: obj.members,
 						exports: obj.exports,
 						globalExports: obj.globalExports,
@@ -159,7 +195,7 @@ function createSymbolReplacer() {
 						//isReplaceableByMethod: !!obj.isReplaceableByMethod,
 						//assignmentDeclarationMembers: obj.assignmentDeclarationMembers,
 						declarations: obj.declarations,
-						valueDeclaration: obj.valueDeclaration
+						valueDeclaration: obj.valueDeclaration,
 					};
 				} catch (ex) {
 					return undefined;
@@ -171,9 +207,9 @@ function createSymbolReplacer() {
 	};
 }
 
-export function sourceFileAST(sourceFile: ts.SourceFile) {
-	var sf = createTSMorphSourceFile(sourceFile);
-	var sym = sf.getSymbol()?.compilerSymbol;
-	
-	return sym ? JSON.stringify(sym, createSymbolReplacer(), "\t"): "";
+export function sourceFileAST(sourceFile: ts.SourceFile, program?: ts.Program) {
+	const syms = [...(sourceFile.locals?.values() || []), sourceFile.symbol];
+
+	console.log(syms);
+	return syms ? JSON.stringify(syms, createSymbolReplacer(program?.getTypeChecker()), "\t") : "error";
 }

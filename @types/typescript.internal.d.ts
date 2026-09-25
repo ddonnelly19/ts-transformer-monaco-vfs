@@ -5348,6 +5348,7 @@ declare namespace ts {
             NameTooLong = 2,
             NameStartsWithDot = 3,
             NameStartsWithUnderscore = 4,
+            NameContainsInvalidCharacters = 5,
             NameContainsNonURISafeCharacters = 5,
         }
         /** @internal */

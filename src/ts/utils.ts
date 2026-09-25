@@ -1,12 +1,11 @@
 import { Project } from "ts-morph";
 import ts from "typescript";
 
+export { applyRefactors, createTSMorphSourceFile, createTSMorphTransform } from "../ts-morph/tsmorphUtils";
+
 export const factory = ts.factory;
 /** A value that can be treated as JSDoc content: raw text, a compiler JSDoc node, or a single tag. */
 type JSDocLike = string | ts.JSDoc | ts.JSDocTag;
-
-/** Union of AST node types that represent some form of value assignment. */
-export type TSAssignmentNode = ts.BinaryExpression | ts.PropertyAssignment | ts.ShorthandPropertyAssignment | ts.SpreadAssignment | ts.VariableDeclaration | ts.AssignmentExpression<ts.EqualsToken>;
 
 /**
  * Narrows `arg` to `T`, returning `false` for `null`, `undefined`, empty
@@ -111,6 +110,8 @@ export function makeJsDocText(lines: string[]) {
 	return ["*", ...lines.map(createSynthesizedComment), " "].join("\n");
 	//return lines.length == 1 ? body.trim() : `*\n${body}\n `;
 }
+
+
 
 /**
  * Extracts the right-hand side / initializer expression from any
@@ -225,8 +226,10 @@ export function createProgramFromSourceFile(sourceText: string, fileName: string
 }
 
 export function isNode(value: any): value is ts.Node {
-	//return !!value && (value.constructor.name == "NodeObject" || ts.isSourceFile(value));
-	return !!value && typeof value.kind === "number" && typeof value.pos === "number" && typeof value.end === "number";
+	return (
+		!!value &&
+		(value.constructor.name == "NodeObject" || ts.isSourceFile(value) || (typeof value.kind === "number" && typeof value.pos === "number" && typeof value.end === "number"))
+	);
 }
 
 /**
@@ -238,7 +241,11 @@ export function isNode(value: any): value is ts.Node {
  * @returns A `ts.CallExpression` representing `left.concat(...right)`.
  */
 export function createStringConcat(left: ts.Expression | string, right: ts.Expression | ts.Expression[]) {
-	return ts.factory.createCallExpression(ts.factory.createPropertyAccessExpression(typeof left == "string" ? ts.factory.createStringLiteral(left) : left, "concat"), undefined, Array.isArray(right) ? right : [right]);
+	return ts.factory.createCallExpression(
+		ts.factory.createPropertyAccessExpression(typeof left == "string" ? ts.factory.createStringLiteral(left) : left, "concat"),
+		undefined,
+		Array.isArray(right) ? right : [right],
+	);
 }
 
 /**
@@ -278,39 +285,254 @@ export function isNodeAssignableToString(node: ts.Node, checker: ts.TypeChecker,
 	return ret;
 }
 
-export function TSgetIdentifier(node: TSAssignmentNode | undefined) {
-	if (!node) return undefined;
-	if (ts.isVariableDeclaration(node) || ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) return node.name;
-	if (ts.isAssignmentExpression(node) || ts.isBinaryExpression(node)) return node.left;
-	if (ts.isSpreadAssignment(node)) return node.name;
+export type TSAssignmentNode =
+	| ts.BinaryExpression
+	| ts.PropertyAssignment
+	| ts.ShorthandPropertyAssignment
+	| ts.SpreadAssignment
+	| ts.VariableDeclaration
+	| ts.AssignmentExpression<ts.EqualsToken>;
+
+export type TSAssignmentTarget =
+	| ts.Expression
+	| ts.BindingName
+	| ts.PropertyName
+	| undefined;
+
+/**
+ * Returns the logical target associated with an assignment-like node.
+ *
+ * Notes:
+ *
+ * - VariableDeclaration returns its binding name.
+ * - PropertyAssignment returns its property name.
+ * - ShorthandPropertyAssignment returns its identifier.
+ * - SpreadAssignment returns its spread expression. This is not a writable
+ *   target, but it is the expression associated with the spread member.
+ * - Binary and assignment expressions return their left-hand side.
+ */
+export function TSgetIdentifier(
+	node: TSAssignmentNode | undefined,
+): TSAssignmentTarget {
+	if (!node) {
+		return undefined;
+	}
+
+	if (ts.isVariableDeclaration(node)) {
+		return node.name;
+	}
+
+	if (ts.isPropertyAssignment(node)) {
+		return node.name;
+	}
+
+	if (ts.isShorthandPropertyAssignment(node)) {
+		return node.name;
+	}
+
+	if (ts.isSpreadAssignment(node)) {
+		return node.expression;
+	}
+
+	if (
+		ts.isAssignmentExpression(node) ||
+		(
+			ts.isBinaryExpression(node) &&
+			node.operatorToken.kind ===
+				ts.SyntaxKind.EqualsToken
+		)
+	) {
+		return node.left;
+	}
+
 	return undefined;
 }
 
-export function isAsConstExpression(node: ts.Node | undefined) {
-	return !!ts.findAncestor(node, (node) => {
-		if (!node || ts.isStatement(node)) return false;
+/**
+ * Determines whether a node is itself contained within a TypeScript or
+ * JavaScript const assertion.
+ *
+ * TypeScript:
+ *
+ *     value as const
+ *
+ * JavaScript:
+ *
+ *     /** @type {const} *\/ (value)
+ *
+ * The ancestor walk stops at statement boundaries so a const assertion in
+ * one statement cannot affect candidate expressions in another statement.
+ */
+export function isAsConstExpression(
+	node: ts.Node | undefined,
+): boolean {
+	if (!node) {
+		return false;
+	}
 
-		if (ts.isParenthesizedExpression(node)) {
-			if (ts.canHaveJSDoc(node.expression)) {
-				if (ts.getJSDocTags(node.expression).some((tag) => ts.isJSDocTypeTag(tag) && ts.isConstTypeReference(tag.typeExpression.type))) return true;
-			}
-		}
-
-		return ts.isAsExpression(node) && ts.isConstTypeReference(node.type);
-	});
-}
-
-export function TSisAssignment(node: ts.Node | undefined): node is ts.BinaryExpression | ts.PropertyAssignment | ts.ShorthandPropertyAssignment | ts.SpreadAssignment | ts.VariableDeclaration | ts.AssignmentExpression<ts.EqualsToken> {
-	if (!node) return false;
 	return (
-		ts.isSpreadAssignment(node) ||
-		ts.isPropertyAssignment(node) ||
-		ts.isShorthandPropertyAssignment(node) ||
-		(ts.isVariableDeclaration(node) && ts.isVariableStatement(node.parent.parent)) ||
-		ts.isAssignmentExpression(node, false) ||
-		(ts.isBinaryExpression(node) && node.operatorToken.kind == ts.SyntaxKind.EqualsToken)
+		ts.findAncestor(node, (ancestor) => {
+			if (ts.isStatement(ancestor)) {
+				return "quit";
+			}
+
+			if (
+				ts.isAsExpression(ancestor) &&
+				ts.isConstTypeReference(ancestor.type)
+			) {
+				return true;
+			}
+
+			if (
+				ts.isParenthesizedExpression(ancestor) &&
+				hasJSDocConstTypeAssertion(ancestor)
+			) {
+				return true;
+			}
+
+			return false;
+		}) !== undefined
 	);
 }
+
+/**
+ * Determines whether a node is one of the assignment-like constructs used by
+ * the transformer.
+ *
+ * Variable declarations only qualify when they belong to a normal
+ * VariableStatement. Declarations inside for, for-in, and for-of statements
+ * are excluded.
+ */
+export function TSisAssignment(
+	node: ts.Node | undefined,
+): node is TSAssignmentNode {
+	if (!node) {
+		return false;
+	}
+
+	if (
+		ts.isSpreadAssignment(node) ||
+		ts.isPropertyAssignment(node) ||
+		ts.isShorthandPropertyAssignment(node)
+	) {
+		return true;
+	}
+
+	if (ts.isVariableDeclaration(node)) {
+		const declarationList = node.parent;
+		const declarationOwner = declarationList.parent;
+
+		return (
+			ts.isVariableDeclarationList(declarationList) &&
+			ts.isVariableStatement(declarationOwner)
+		);
+	}
+
+	if (ts.isAssignmentExpression(node, false)) {
+		return true;
+	}
+
+	return (
+		ts.isBinaryExpression(node) &&
+		node.operatorToken.kind ===
+			ts.SyntaxKind.EqualsToken
+	);
+}
+
+/**
+ * Determines whether a variable declaration uses const.
+ */
+export function TSisConstVariableDeclaration(
+	node: ts.Node | undefined,
+): node is ts.VariableDeclaration {
+	if (
+		!node ||
+		!ts.isVariableDeclaration(node)
+	) {
+		return false;
+	}
+
+	const declarationList = node.parent;
+
+	return (
+		ts.isVariableDeclarationList(declarationList) &&
+		(declarationList.flags & ts.NodeFlags.Const) !== 0
+	);
+}
+
+/**
+ * Finds the first parent that is not a ParenthesizedExpression.
+ */
+export function TSgetNonParenthesizedParent(
+	node: ts.Node,
+): ts.Node | undefined {
+	let parent = node.parent;
+
+	while (
+		parent &&
+		ts.isParenthesizedExpression(parent)
+	) {
+		parent = parent.parent;
+	}
+
+	return parent;
+}
+
+/**
+ * Walks outward from an expression and returns the outermost parenthesized
+ * expression that contains it.
+ */
+export function TSgetOutermostParenthesizedExpression(
+	expression: ts.Expression,
+): ts.Expression {
+	let current = expression;
+
+	while (
+		current.parent &&
+		ts.isParenthesizedExpression(current.parent) &&
+		current.parent.expression === current
+	) {
+		current = current.parent;
+	}
+
+	return current;
+}
+
+/**
+ * Detects:
+ *
+ *     /** @type {const} *\/ (expression)
+ *
+ * Depending on parser attachment behavior, the JSDoc may be associated with
+ * the parenthesized expression or with its inner expression. Both locations
+ * are checked.
+ */
+function hasJSDocConstTypeAssertion(
+	node: ts.ParenthesizedExpression,
+): boolean {
+	return (
+		hasJSDocConstTypeTag(node) ||
+		hasJSDocConstTypeTag(node.expression)
+	);
+}
+
+function hasJSDocConstTypeTag(
+	node: ts.Node,
+): boolean {
+	if (!ts.canHaveJSDoc(node)) {
+		return false;
+	}
+
+	return ts.getJSDocTags(node).some(
+		(tag) =>
+			ts.isJSDocTypeTag(tag) &&
+			tag.typeExpression !== undefined &&
+			ts.isConstTypeReference(
+				tag.typeExpression.type,
+			),
+	);
+}
+``
 
 /**
  * Creates a shallow, mutable clone of the given AST node with the
@@ -384,7 +606,15 @@ export function applyJsDoc<T extends ts.Node>(node: T, jsDocLines: string[]): T 
 export function createNode<T extends ts.Node>(node: T): T {
 	// Declarations -------------------------------------------------------------
 	if (ts.isSourceFile(node)) {
-		return ts.factory.updateSourceFile(node, node.statements, node.isDeclarationFile, node.referencedFiles, node.typeReferenceDirectives, node.hasNoDefaultLib, node.libReferenceDirectives) as unknown as T;
+		return ts.factory.updateSourceFile(
+			node,
+			node.statements,
+			node.isDeclarationFile,
+			node.referencedFiles,
+			node.typeReferenceDirectives,
+			node.hasNoDefaultLib,
+			node.libReferenceDirectives,
+		) as unknown as T;
 	}
 	if (ts.isVariableStatement(node)) {
 		return ts.factory.createVariableStatement(node.modifiers, node.declarationList) as unknown as T;
@@ -449,7 +679,16 @@ export function createNode<T extends ts.Node>(node: T): T {
 		return ts.factory.createConstructorDeclaration(node.modifiers, node.parameters, node.body) as unknown as T;
 	}
 	if (ts.isMethodDeclaration(node)) {
-		return ts.factory.createMethodDeclaration(node.modifiers, node.asteriskToken, node.name, node.questionToken, node.typeParameters, node.parameters, node.type, node.body) as unknown as T;
+		return ts.factory.createMethodDeclaration(
+			node.modifiers,
+			node.asteriskToken,
+			node.name,
+			node.questionToken,
+			node.typeParameters,
+			node.parameters,
+			node.type,
+			node.body,
+		) as unknown as T;
 	}
 	if (ts.isGetAccessorDeclaration(node)) {
 		return ts.factory.createGetAccessorDeclaration(node.modifiers, node.name, node.parameters, node.type, node.body) as unknown as T;
@@ -727,7 +966,15 @@ export function createNode<T extends ts.Node>(node: T): T {
 export function updateNode<T extends ts.Node>(node: T): T {
 	// Declarations -------------------------------------------------------------
 	if (ts.isSourceFile(node)) {
-		return ts.factory.updateSourceFile(node, node.statements, node.isDeclarationFile, node.referencedFiles, node.typeReferenceDirectives, node.hasNoDefaultLib, node.libReferenceDirectives) as unknown as T;
+		return ts.factory.updateSourceFile(
+			node,
+			node.statements,
+			node.isDeclarationFile,
+			node.referencedFiles,
+			node.typeReferenceDirectives,
+			node.hasNoDefaultLib,
+			node.libReferenceDirectives,
+		) as unknown as T;
 	}
 	if (ts.isVariableStatement(node)) {
 		return ts.factory.updateVariableStatement(node, node.modifiers, node.declarationList) as unknown as T;
@@ -739,7 +986,16 @@ export function updateNode<T extends ts.Node>(node: T): T {
 		return ts.factory.updateVariableDeclaration(node, node.name, node.exclamationToken, node.type, node.initializer) as unknown as T;
 	}
 	if (ts.isFunctionDeclaration(node)) {
-		return ts.factory.updateFunctionDeclaration(node, node.modifiers, node.asteriskToken, node.name, node.typeParameters, node.parameters, node.type, node.body) as unknown as T;
+		return ts.factory.updateFunctionDeclaration(
+			node,
+			node.modifiers,
+			node.asteriskToken,
+			node.name,
+			node.typeParameters,
+			node.parameters,
+			node.type,
+			node.body,
+		) as unknown as T;
 	}
 	if (ts.isClassDeclaration(node)) {
 		return ts.factory.updateClassDeclaration(node, node.modifiers, node.name, node.typeParameters, node.heritageClauses, node.members) as unknown as T;
@@ -792,7 +1048,17 @@ export function updateNode<T extends ts.Node>(node: T): T {
 		return ts.factory.updateConstructorDeclaration(node, node.modifiers, node.parameters, node.body) as unknown as T;
 	}
 	if (ts.isMethodDeclaration(node)) {
-		return ts.factory.updateMethodDeclaration(node, node.modifiers, node.asteriskToken, node.name, node.questionToken, node.typeParameters, node.parameters, node.type, node.body) as unknown as T;
+		return ts.factory.updateMethodDeclaration(
+			node,
+			node.modifiers,
+			node.asteriskToken,
+			node.name,
+			node.questionToken,
+			node.typeParameters,
+			node.parameters,
+			node.type,
+			node.body,
+		) as unknown as T;
 	}
 	if (ts.isGetAccessorDeclaration(node)) {
 		return ts.factory.updateGetAccessorDeclaration(node, node.modifiers, node.name, node.parameters, node.type, node.body) as unknown as T;
@@ -1326,12 +1592,16 @@ export function exprReviver(key: any, value: any): ts.Expression {
 			case "boolean":
 				return value ? ts.factory.createTrue() : ts.factory.createFalse();
 			case "number":
-				return value < 0 ? ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(value * -1)) : ts.factory.createNumericLiteral(value);
+				return value < 0 ?
+						ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(value * -1))
+					:	ts.factory.createNumericLiteral(value);
 			case "undefined":
 				return ts.factory.createIdentifier("undefined");
 			case "function":
 				var sf = ts.createSourceFile("generated.js", value + "", ts.ScriptTarget.Latest, undefined);
-				return sf.statements.length > 0 && ts.isExpressionStatement(sf.statements[0]) ? sf.statements[0].expression : ts.factory.createNoSubstitutionTemplateLiteral(value + "");
+				return sf.statements.length > 0 && ts.isExpressionStatement(sf.statements[0]) ?
+						sf.statements[0].expression
+					:	ts.factory.createNoSubstitutionTemplateLiteral(value + "");
 			case "object":
 				if (ts.isExpression(value as any)) return value as unknown as ts.Expression;
 				if (Array.isArray(value)) {
@@ -1419,7 +1689,11 @@ export function printSourceText(value: any) {
 	if (isEmpty(value)) return "null";
 	var sf: ts.SourceFile;
 	//if (typeof value == "object") {
-	sf = ts.factory.createSourceFile([ts.factory.createExpressionStatement(exprReviver(null, value))], ts.factory.createToken(ts.SyntaxKind.EndOfFileToken), ts.NodeFlags.JavaScriptFile);
+	sf = ts.factory.createSourceFile(
+		[ts.factory.createExpressionStatement(exprReviver(null, value))],
+		ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+		ts.NodeFlags.JavaScriptFile,
+	);
 
 	//} else {
 	//sf = ts.createSourceFile("generated.js", value + "", ts.ScriptTarget.Latest, true)
@@ -1481,7 +1755,9 @@ export function moveComments<T extends ts.Node>(newNode: T, originalNode?: ts.No
 		var thisNode = originalNode ?? newNode;
 		const text = thisNode.getFullText();
 
-		(ts.getLeadingCommentRanges(text, 0) || []).map((range) => commentRangeToSynthetic(text, range)).forEach((range) => ts.addSyntheticLeadingComment(thisNode, range.kind, range.text, range.hasTrailingNewLine));
+		(ts.getLeadingCommentRanges(text, 0) || [])
+			.map((range) => commentRangeToSynthetic(text, range))
+			.forEach((range) => ts.addSyntheticLeadingComment(thisNode, range.kind, range.text, range.hasTrailingNewLine));
 
 		(ts.getTrailingCommentRanges(text, thisNode.end - thisNode.pos) || [])
 			.map((range) => commentRangeToSynthetic(text, range))
@@ -1498,9 +1774,8 @@ export function moveComments<T extends ts.Node>(newNode: T, originalNode?: ts.No
 
 export function isAmbientContext(node: ts.Node): boolean {
 	let current: ts.Node | undefined = node.parent;
-
 	while (current) {
-		if (ts.isDeclaration(current) && ts.getCombinedModifierFlags(current) & ts.ModifierFlags.Ambient) {
+		if (ts.canHaveModifiers(current) && !!ts.getModifiers(current)?.find((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)) {
 			return true;
 		}
 

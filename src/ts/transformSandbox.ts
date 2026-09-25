@@ -1,5 +1,5 @@
 import * as tsvfs from "@typescript/vfs"
-import ts from "typescript"
+import ts from "typescript";
 import { getASTFactory } from "./tsFactory"
 import { getAstStructure } from "../ts-morph/tsmorphUtils"
 import { sourceFileAST } from "./SymbolSerializer"
@@ -122,8 +122,8 @@ export async function runTransform({
 	) => {
 		var program = ts.createProgram([inputFileName], options, compilerHost);
 		ts.transform(
-			//program.getSourceFile(inputFileName)!,
-			ts.createSourceFile(inputFileName, system.readFile(inputFileName)!, ts.ScriptTarget.ESNext, true),
+			program.getSourceFile(inputFileName)!,
+			//ts.createSourceFile(inputFileName, system.readFile(inputFileName)!, ts.ScriptTarget.ESNext, true),
 			[
 				transformer({ program, languageServiceHost })
 			]
@@ -211,7 +211,7 @@ export async function runTransform({
 		transformedTs: transformedTsText,
 		emittedJs: env.sys.readFile('dist/input.js') || '',
 		dts: env.sys.readFile('dist/input.d.ts') || '',
-		structure: sourceFileAST(sf!),
+		structure: getAstStructure(sf!),
 		errors,
 		errorPositions,
 		debugLogs,

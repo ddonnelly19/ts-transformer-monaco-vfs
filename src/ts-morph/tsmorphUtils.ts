@@ -24,7 +24,12 @@ import { IdentifierString, isEmpty, isNotEmpty, isValidIdentifier, printSourceTe
 import _path from "path";
 import createConsts from "../../storage/transformers/createConsts";
 
-type NodeVisitor<TIn extends ts.Node = ts.Node, TOut extends ts.Node | undefined = TIn | undefined> = (node: TIn, visitor: ts.Visitor<TIn, TOut>, context?: ts.TransformationContext, program?: ts.Program) => ts.VisitResult<TOut>;
+type NodeVisitor<TIn extends ts.Node = ts.Node, TOut extends ts.Node | undefined = TIn | undefined> = (
+	node: TIn,
+	visitor: ts.Visitor<TIn, TOut>,
+	context?: ts.TransformationContext,
+	program?: ts.Program,
+) => ts.VisitResult<TOut>;
 
 /**
  * Wraps a {@link NodeVisitor} function into a `ts.TransformerFactory` that
@@ -35,7 +40,10 @@ type NodeVisitor<TIn extends ts.Node = ts.Node, TOut extends ts.Node | undefined
  * @param program - Optional TypeScript program forwarded to the visitor.
  * @returns A `ts.TransformerFactory` wrapping the visitor.
  */
-export function visitNodes<TIn extends ts.Node = ts.Node, TOut extends ts.Node | undefined = TIn | undefined>(visitorFn: NodeVisitor<TIn, TOut>, program?: ts.Program): ts.TransformerFactory<TIn> {
+export function visitNodes<TIn extends ts.Node = ts.Node, TOut extends ts.Node | undefined = TIn | undefined>(
+	visitorFn: NodeVisitor<TIn, TOut>,
+	program?: ts.Program,
+): ts.TransformerFactory<TIn> {
 	return (context: ts.TransformationContext) => {
 		return (sourceFile: TIn) => {
 			var __visitor = (node: any) => {
@@ -59,7 +67,12 @@ export function visitNodes<TIn extends ts.Node = ts.Node, TOut extends ts.Node |
  * @param compilerOptions - Optional compiler options to use during the transformation.
  * @returns The result of the transformation, including the transformed nodes.
  */
-export function transformScript<T extends ts.Node = ts.Node>(source: T | T[], visitors: NodeVisitor<T>[], program?: ts.Program, compilerOptions: ts.CompilerOptions | undefined = program?.getCompilerOptions()) {
+export function transformScript<T extends ts.Node = ts.Node>(
+	source: T | T[],
+	visitors: NodeVisitor<T>[],
+	program?: ts.Program,
+	compilerOptions: ts.CompilerOptions | undefined = program?.getCompilerOptions(),
+) {
 	return ts.transform<T>(
 		source,
 		visitors.map((v) => visitNodes(v, program)),
@@ -151,7 +164,13 @@ export function isRemoveable<T extends Node>(
 	return !!node && "remove" in node && typeof node.remove == "function";
 }
 
-export type AssignmentNode = SpreadAssignment | PropertyAssignment | ShorthandPropertyAssignment | VariableDeclaration | BinaryExpression | AssignmentExpression<ts.AssignmentExpression<ts.EqualsToken>>;
+export type AssignmentNode =
+	| SpreadAssignment
+	| PropertyAssignment
+	| ShorthandPropertyAssignment
+	| VariableDeclaration
+	| BinaryExpression
+	| AssignmentExpression<ts.AssignmentExpression<ts.EqualsToken>>;
 
 /**
  * Type guard: returns `true` when `node` is a ts-morph assignment expression
@@ -203,7 +222,9 @@ export function nodeEquals<T extends Node>(node1: T, node2?: any): node2 is T {
 	if (!Node.isNode(node2)) return false;
 	if (node1.wasForgotten() || node2.wasForgotten()) return false;
 	if (Node.isSourceFile(node1) && Node.isSourceFile(node2)) return node1.getFilePath().localeCompare(node2.getFilePath()) == 0;
-	return nodeEquals(node1.getSourceFile(), node2.getSourceFile()) && node1.getKind() == node2.getKind() && node1.getStart() == node2.getStart() && node1.getEnd() == node2.getEnd();
+	return (
+		nodeEquals(node1.getSourceFile(), node2.getSourceFile()) && node1.getKind() == node2.getKind() && node1.getStart() == node2.getStart() && node1.getEnd() == node2.getEnd()
+	);
 }
 
 /**
@@ -252,8 +273,10 @@ export function getFullyQualifiedName<T extends Node>(node?: T, appendDot?: bool
 				}
 				return `${getFullyQualifiedName(parentSym, true) || ""}${appendDot && isNotEmpty(name) ? `${name}.` : name}`;
 			}
-			if (Node.isLeftHandSideExpressioned(parentSym) && hasNameNode(parentSym)) return nodeEquals(node, parentSym.getNameNode()) ? getFullyQualifiedName(parentSym, appendDot) : "";
-			else if (isAssignment(parentSym) || Node.isTypeQuery(parentSym) || Node.isHeritageClause(parentSym) || Node.isExpressionWithTypeArguments(parentSym)) parentSym = undefined;
+			if (Node.isLeftHandSideExpressioned(parentSym) && hasNameNode(parentSym))
+				return nodeEquals(node, parentSym.getNameNode()) ? getFullyQualifiedName(parentSym, appendDot) : "";
+			else if (isAssignment(parentSym) || Node.isTypeQuery(parentSym) || Node.isHeritageClause(parentSym) || Node.isExpressionWithTypeArguments(parentSym))
+				parentSym = undefined;
 			else if (!appendDot && (Node.isQualifiedName(parentSym) || Node.isPropertyAccessExpression(parentSym))) {
 				name = parentSym.getText();
 			} else {
@@ -382,7 +405,12 @@ export function convertSourceFile(sourceFile: SourceFile, extension: string) {
 				if (!node) return undefined;
 				if (ts.isInJSFile(node)) {
 					if (ts.isAsExpression(node)) {
-						return ts.addSyntheticLeadingComment(ts.factory.createParenthesizedExpression(node.expression), ts.SyntaxKind.MultiLineCommentTrivia, `* @type {${printNode(node.type)}} `, false);
+						return ts.addSyntheticLeadingComment(
+							ts.factory.createParenthesizedExpression(node.expression),
+							ts.SyntaxKind.MultiLineCommentTrivia,
+							`* @type {${printNode(node.type)}} `,
+							false,
+						);
 					}
 				} else {
 					var mNode = createWrappedNode(node, {
@@ -406,18 +434,6 @@ export function convertSourceFile(sourceFile: SourceFile, extension: string) {
 			return ts.visitEachChild(sourceFile, visitor, context);
 		},
 	]);
-
-	/*newSf.getDescendants()
-		.filter(Node.isIdentifier)
-		.forEach(node => {
-			var refs = node
-				.findReferences()
-				.flatMap(r => r.getReferences())
-				.filter(r => r.isWriteAccess())
-				.map(r => r.getNode().getParent());
-			var defs = node.getDefinitions()
-				
-		})*/
 
 	if (!isJavascrpt(newSf)) {
 		newSf = combinedFix(newSf, "annotateWithTypeFromJSDoc")!;
@@ -462,15 +478,20 @@ export function applyRefactors(sourceFile?: SourceFile, kind?: string, name?: st
 	var refactors: ts.ApplicableRefactorInfo[] = [];
 	function isApplicable(node: Node) {
 		if (kind == "refactor.rewrite.string" && (Node.isStringLiteral(node) || Node.isSourceFile(node) || Node.isSyntaxList(node))) return false;
-		refactors = refactors.concat(
-			_this
-				.getLanguageService()
-				.compilerObject.getApplicableRefactors(node.getSourceFile()?.getFilePath(), node.compilerNode, preferences, "invoked", kind, false)
-				.filter((info) => (!!name ? info.name == name : true))
-				.filter((info) => (!!kind ? info.actions.some((action) => action.kind?.startsWith(kind)) : true))
-				.filter((info) => !(info.name == "Extract type" && Node.isBooleanKeyword(node))),
-		);
-		return refactors.length > 0;
+		try {
+			var filePath = node.getSourceFile()?.compilerNode.fileName;
+			refactors = refactors.concat(
+				_this
+					.getLanguageService()
+					.compilerObject.getApplicableRefactors(filePath, node.compilerNode, preferences, "invoked", kind, false)
+					.filter((info) => (!!name ? info.name == name : true))
+					.filter((info) => (!!kind ? info.actions.some((action) => action.kind?.startsWith(kind)) : true))
+					.filter((info) => !(info.name == "Extract type" && Node.isBooleanKeyword(node))),
+			);
+			return refactors.length > 0;
+		} catch (ex) {
+			return false;
+		}
 	}
 
 	try {
@@ -480,7 +501,9 @@ export function applyRefactors(sourceFile?: SourceFile, kind?: string, name?: st
 				.flatMap((refactor) =>
 					refactor.actions
 						.filter((action) => (!!kind ? action.kind?.startsWith(kind) : true))
-						.flatMap((action) => _this.getLanguageService().getEditsForRefactor(node.getSourceFile(), formatContext, node, refactor.name, action.name, preferences)?.getEdits()),
+						.flatMap((action) =>
+							_this.getLanguageService().getEditsForRefactor(node.getSourceFile(), formatContext, node, refactor.name, action.name, preferences)?.getEdits(),
+						),
 				)
 				.filter((a) => !!a);
 			//console.log(`applying refactors "${kind}" on (${node.getKindName()}) "${node.getFullText()}" for ${sourceFile.getFilePath()}: ${changes.length}`)
@@ -488,7 +511,7 @@ export function applyRefactors(sourceFile?: SourceFile, kind?: string, name?: st
 			return applyRefactors(sourceFile, kind, name);
 		}
 	} catch (ex) {
-		console.error(`error applying refactors "${kind}" for ${sourceFile?.getFilePath()}`, ex);
+		console.error(`error applying refactors "${kind}"}`, ex);
 	}
 	return sourceFile;
 }
@@ -530,12 +553,16 @@ function exprReviver(this: any, key: string, value: unknown): ts.Expression | un
 				if (key == "kind" && value in StructureKind) {
 					return ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier("StructureKind"), `${StructureKind[value]}`);
 				}
-				return value < 0 ? ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(value * -1)) : ts.factory.createNumericLiteral(value);
+				return value < 0 ?
+						ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(value * -1))
+					:	ts.factory.createNumericLiteral(value);
 			case "undefined":
 				return !!key ? undefined : ts.factory.createIdentifier("undefined");
 			case "function":
 				var sf = ts.createSourceFile("generated.js", value + "", ts.ScriptTarget.Latest, undefined);
-				return sf.statements.length > 0 && ts.isExpressionStatement(sf.statements[0]) ? sf.statements[0].expression : ts.factory.createNoSubstitutionTemplateLiteral(value + "");
+				return sf.statements.length > 0 && ts.isExpressionStatement(sf.statements[0]) ?
+						sf.statements[0].expression
+					:	ts.factory.createNoSubstitutionTemplateLiteral(value + "");
 			case "object":
 				if (ts.isExpression(value as any)) return value as unknown as ts.Expression;
 				if (Array.isArray(value)) {
@@ -560,63 +587,6 @@ function exprReviver(this: any, key: string, value: unknown): ts.Expression | un
 				}
 				if (value.trim() == "") return !!key ? undefined : ts.factory.createNull();
 
-				/* try {
-					var ret = JSON.parse(value, exprReviver);
-					return ret;
-				} catch (ex) {
-
-				} */
-
-				/*try {
-						var host = createInMemoryCompilerHost();
-						host.setFile("generated.js", value);
-						var program = host.createProgram();
-						let sf = program.getSourceFile("generated.js");
-	
-						//let sf = ts.createSourceFile("generated.js", value, ts.ScriptTarget.Latest, undefined, ts.ScriptKind.JS);
-						if (sf) {
-							var diags = program.getSyntacticDiagnostics(sf);
-							if (diags.length == 0) {
-								var expr = sf.statements.length > 0 && ts.isExpressionStatement(sf.statements[0]) ? sf.statements[0].expression : undefined;
-								if (expr && !ts.isLiteralExpression(expr) && !ts.isIdentifier(expr)) {
-									var factory = ts.factory;
-									return factory.createArrowFunction(
-										undefined,
-										undefined,
-										[factory.createParameterDeclaration(
-											undefined,
-											undefined,
-											factory.createObjectBindingPattern([]),
-											undefined,
-											undefined,
-											undefined
-										)],
-										undefined,
-										factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-										factory.createCallExpression(
-											factory.createParenthesizedExpression(factory.createFunctionExpression(
-												undefined,
-												undefined,
-												undefined,
-												undefined,
-												[],
-												undefined,
-												factory.createBlock(
-													sf.statements,
-													true
-												)
-											)),
-											undefined,
-											[]
-										)
-									);
-								}
-							}
-						}
-					} catch (ex) {
-	
-					}*/
-
 				return ts.factory.createNoSubstitutionTemplateLiteral(value);
 			default:
 				break;
@@ -639,8 +609,7 @@ function exprReviver(this: any, key: string, value: unknown): ts.Expression | un
  * @returns A trimmed TypeScript source string containing the structure literal.
  */
 export function getAstStructure(sf: ts.SourceFile) {
-
-	const sourceFile = createTSMorphSourceFile(sf)
+	const sourceFile = createTSMorphSourceFile(sf);
 
 	var expr = JSON.parse(JSON.stringify(sourceFile.getStructure()), exprReviver);
 
@@ -668,8 +637,26 @@ const structure: SourceFileStructure = ${printSourceText(expr)};
 	return ret.trim();
 }
 
-export function createTSMorphSourceFile(sf: ts.SourceFile) {
-	const project = new Project({ useInMemoryFileSystem: true });
+export function createTSMorphSourceFile(sf: ts.SourceFile, compilerOptions?: ts.CompilerOptions) {
+	const project = new Project({ useInMemoryFileSystem: true, compilerOptions });
 
-	return project.createSourceFile(sf.fileName, printNode(sf));
+	var newsf = project.createSourceFile(sf.fileName, printNode(sf), { overwrite: true });
+	return newsf;
+}
+
+/**
+ * Adapts a synchronous ts-morph edit into a compiler transformer factory.
+ *
+ * The edit runs against an isolated in-memory project. Only the transformed
+ * statements are copied back to the original compiler source file, preserving
+ * its identity and transformation context.
+ */
+export function createTSMorphTransform(
+	edit: (sourceFile: SourceFile, context: ts.TransformationContext) => SourceFile | void,
+): ts.TransformerFactory<ts.SourceFile> {
+	return (context) => (sourceFile) => {
+		const wrapped = createTSMorphSourceFile(sourceFile, context.getCompilerOptions());
+		const transformed = edit(wrapped, context) || wrapped;
+		return context.factory.updateSourceFile(sourceFile, transformed.compilerNode.statements);
+	};
 }

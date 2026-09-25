@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { createWrappedNode, Node, printNode } from "ts-morph";
+import { createWrappedNode, Node } from "ts-morph";
 
 export const fixProtoType: ts.TransformerFactory<ts.SourceFile> = (context) => (sourceFile) => {
 	const visitor: ts.Visitor = <T extends ts.Node>(
@@ -44,7 +44,7 @@ export const fixProtoType: ts.TransformerFactory<ts.SourceFile> = (context) => (
 			}
 			// Convert function statements to declarations
 			if (mNode.getDeclarations().length == 1) {
-				var stmt = mNode.getDeclarations()[0];
+				var stmt = mNode.getDeclarations()[0]!;
 				//console.log(`nodeType for ${getText(stmt.name)}: ${checker.typeToString(type)}`);
 				var initializer = stmt.getInitializer();
 				if (!!initializer) {

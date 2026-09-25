@@ -1,1 +1,1 @@
-convertClassToInterface.ts
+prefer-const.ts

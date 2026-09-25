@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { addJSDocs } from "../utils";
+import { addJSDocs } from "./utils";
 
 const testTransform: ts.TransformerFactory<ts.SourceFile> = (context) => {
 	//var program = ts.createProgram([inputFileName], context.getCompilerOptions(), ts.createCompilerHost(context.getCompilerOptions(), true));
@@ -67,4 +67,4 @@ const testTransform: ts.TransformerFactory<ts.SourceFile> = (context) => {
 	}
 }
 
-export { testTransform }
+export default ({}) => testTransform

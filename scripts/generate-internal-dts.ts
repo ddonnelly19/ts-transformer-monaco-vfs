@@ -1,17 +1,15 @@
-#!/usr/bin / env node
 /**
  * Generates a single `typescript-internal.d.ts` including @internal members
  * from the latest TypeScript source, with Windows long-path safe handling.
  */
 
 import { execSync } from "child_process";
-import { writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
-import { relative, join, resolve } from "path";
+import { existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
+import type { ExecSyncOptions } from "node:child_process";
+import type { PathLike } from "node:fs";
+import { join, resolve } from "path";
 
-/**
- * @param {string} cmd
- */
-function run(cmd, opts = {}) {
+function run(cmd: string, opts: ExecSyncOptions = {}) {
 	try {
 		console.log(`\n> ${cmd}`);
 		execSync(cmd, {
@@ -23,10 +21,7 @@ function run(cmd, opts = {}) {
 	}
 }
 
-/**
- * @param {import("node:fs").PathLike} dir
- */
-function ensureDir(dir) {
+function ensureDir(dir: PathLike) {
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
@@ -47,7 +42,7 @@ function main() {
 	
 	//if (!existsSync(join(repoDir, ".git")))
 	
-	run(`git clone  -c core.longpaths=true --depth 1 https://github.com/microsoft/TypeScript.git "${repoDir}"`);
+	run(`git clone  -c core.longpaths=true --depth 1 --branch v6.0.3 https://github.com/microsoft/TypeScript.git "${repoDir}"`);
 	//run(`git config core.longpaths true`, { cwd: repoDir });
 	// Enable long paths in this local repo (helps if system setting isn't applied)
 
@@ -55,8 +50,8 @@ function main() {
 	// Optional: sparse checkout to limit to src and build essentials
 	// (TypeScript uses a standard structure; this reduces path breadth)
 	try {
-		run(`git sparse-checkout init --cone`, { cwd: repoDir });
-		run(`git sparse-checkout set src scripts`, { cwd: repoDir });
+		//run(`git sparse-checkout init --cone`, { cwd: repoDir });
+		//run(`git sparse-checkout set src scripts`, { cwd: repoDir });
 	} catch {
 		// Sparse checkout not available in older Git; ignore
 	}

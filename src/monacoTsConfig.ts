@@ -25,20 +25,22 @@ import tsMorph from "../node_modules/ts-morph/lib/ts-morph.d.ts?raw";
  * @returns `true` when configuration was applied successfully, `false` if the
  *   TypeScript language service was not ready.
  */
-export function configureMonacoTs(monacoInstance: typeof import('monaco-editor') | null) {
-	// prefer provided monaco instance (from @monaco-editor/react onMount)
-	const mon = monacoInstance
+export function configureMonacoTs(monacoInstance: typeof import("monaco-editor") | null) {
+	// vite: import all transformer files as raw text
 
-	const ts = mon?.typescript
+	// prefer provided monaco instance (from @monaco-editor/react onMount)
+	const mon = monacoInstance;
+
+	const ts = mon?.typescript;
 
 	if (!ts || !ts.typescriptDefaults) {
 		//console.warn('TypeScript service not available yet')
-		return false
+		return false;
 	}
 
-	const defaults = ts.typescriptDefaults
+	const defaults = ts.typescriptDefaults;
 
-	defaults.setEagerModelSync(true)
+	defaults.setEagerModelSync(true);
 	defaults.setCompilerOptions({
 		target: ts.ScriptTarget.ESNext,
 		module: ts.ModuleKind.ESNext,
@@ -49,38 +51,57 @@ export function configureMonacoTs(monacoInstance: typeof import('monaco-editor')
 		checkJs: true,
 		allowNonTsExtensions: true,
 		allowSyntheticDefaultImports: true,
-		"paths": {
-			"typescript": ["file:///typescript.d.ts"],
+		paths: {
+			typescript: ["file:///typescript.d.ts"],
 			//"@typescript/vfs": ["file:///./node_modules/@typescript/vfs/dist/index.d.ts"]
 		},
-		"outDir": "dist",
+		outDir: "dist",
 		//"rootDir": "src",
-		skipLibCheck: true
-	})
-	
+		skipLibCheck: true,
+	});
+
 	defaults.setDiagnosticsOptions({
 		noSemanticValidation: false,
 		noSyntaxValidation: false,
-	})
-	
-	defaults.addExtraLib(tsMorph, 'file:///ts-morph.d.ts')
-	defaults.addExtraLib(tsTypes, 'file:///typescript.d.ts')
+	});
+
+	defaults.addExtraLib(tsMorph, "file:///ts-morph.d.ts");
+	defaults.addExtraLib(tsTypes, "file:///typescript.d.ts");
 
 	// Ambient declaration: provide IntelliSense for global `ts` symbol
-	defaults.addExtraLib(`import * as ts from "./typescript";`, 'file:///ambient/ts-global.d.ts')
-	defaults.addExtraLib(utils, "file:///utils.ts")
-	defaults.addExtraLib(`
+	defaults.addExtraLib(`import * as ts from "./typescript";`, "file:///ambient/ts-global.d.ts");
+	defaults.addExtraLib(utils, "file:///utils.ts");
+	defaults.addExtraLib(
+		`
 declare const ts: typeof import("typescript");
 declare const factory: typeof ts["factory"];
-`, `file:///ambient/ts-global2.d.ts`)
+`,
+		`file:///ambient/ts-global2.d.ts`,
+	);
+	
+	// 	const transformerLibs = import.meta.glob("../storage/transformers/**/*.{ts,js,d.ts}", {
+	// 	query: "?raw",
+	// 	import: "default",
+	// 	eager: true,
+	// }) as Record<string, string>;
+	/*for (const [path, content] of Object.entries(transformerLibs)) {
+		const fileName = path.split("/").pop()!;
+		if (fileName != "transformers.ts" && fileName != "utils.ts") {
+			const virtualPath = `file:///${path}`;
+
+			defaults.addExtraLib(content, virtualPath);
+		}
+	}*/
 
 	mon.json.jsonDefaults.setDiagnosticsOptions({
 		validate: true,
-		"schemas": [{
-			"fileMatch": ["file://compilerOptions.json"],			
-			"uri": "https://www.schemastore.org/tsconfig"
-		}]
-	})
+		schemas: [
+			{
+				fileMatch: ["file://compilerOptions.json"],
+				uri: "https://www.schemastore.org/tsconfig",
+			},
+		],
+	});
 
-	return true
+	return true;
 }

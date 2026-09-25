@@ -2,55 +2,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"type": "msedge",
+			"type": "pwa-msedge",
 			"name": "Launch Microsoft Edge",
 			"request": "launch",
+			"url": "http://localhost:5173",
+			"webRoot": "${workspaceFolder}",
+			"userDataDir": "${workspaceFolder}/.vscode/edge-debug-profile",
 			"runtimeArgs": [
-				"--remote-debugging-port=9222"
-			],
-			"url": "http://localhost:5173", // Provide your project's url to finish configuring
-			"presentation": {
-				"hidden": false
-			},
-			"preLaunchTask": "npm: dev"
-		},
-		{
-			"type": "msedge",
-			"name": "Launch Microsoft Edge in headless mode",
-			"request": "launch",
-			"runtimeArgs": [
-				"--headless",
-				"--remote-debugging-port=9222"
-			],
-			"url": "http://localhost:5173", // Provide your project's url to finish configuring
-			"presentation": {
-				"hidden": true
-			}
-		},
-		{
-			"type": "vscode-edge-devtools.debug",
-			"name": "Open Edge DevTools",
-			"request": "attach",
-			"url": "http://localhost:5173", // Provide your project's url to finish configuring
-			"presentation": {
-				"hidden": true
-			}
-		}
-	],
-	"compounds": [
-		{
-			"name": "Launch Edge Headless and attach DevTools",
-			"configurations": [
-				"Launch Microsoft Edge in headless mode",
-				"Open Edge DevTools"
-			],
-			"preLaunchTask": "npm: dev"
-		},
-		{
-			"name": "Launch Edge and attach DevTools",
-			"configurations": [
-				"Launch Microsoft Edge",
-				"Open Edge DevTools"
+				"--remote-allow-origins=*"
 			],
 			"preLaunchTask": "npm: dev"
 		}

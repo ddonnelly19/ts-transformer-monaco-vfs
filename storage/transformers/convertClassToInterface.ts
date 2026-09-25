@@ -200,10 +200,10 @@ function classToInterfaceTransformer({ host, program, sourceFile }: {
 
 				// Only propagate export / default modifiers.
 				const nodeModifiers = getNodeModifiers(node);
-				const exportModifiers: ts.Modifier[] | undefined = isAmbientContext(node) ? undefined : nodeModifiers?.filter(
+				const exportModifiers: ts.Modifier[] = nodeModifiers?.filter(
 					modifier => modifier.kind === ts.SyntaxKind.ExportKeyword
 						|| modifier.kind === ts.SyntaxKind.DefaultKeyword
-				)
+				) || [];
 
 				const instanceIface = factory.createInterfaceDeclaration(
 					exportModifiers?.length ? exportModifiers : undefined,
@@ -226,7 +226,11 @@ function classToInterfaceTransformer({ host, program, sourceFile }: {
 				);
 
 				const varStatement = factory.createVariableStatement(
-					exportModifiers,
+					[
+						...exportModifiers,
+						isAmbientContext(node) ?  undefined : factory.createToken(ts.SyntaxKind.DeclareKeyword)
+						
+					].filter(a => !!a),	
 					factory.createVariableDeclarationList(
 						[factory.createVariableDeclaration(
 							factory.createIdentifier(name),
