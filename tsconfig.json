@@ -16,9 +16,6 @@
 		"forceConsistentCasingInFileNames": true,
 		"sourceMap": false,
 		"allowSyntheticDefaultImports": true,		
-		"typeRoots": [
-			"@types"
-		],
 		"paths": {
 			"@ts-morph/common": [
 				"./@types/tsmorph.d.ts"	
@@ -26,7 +23,12 @@
 			"typescript": [
 				"./@types/typescript.internal.d.ts"
 			]
-		}
+		},	
+		"types": [
+			//"node",
+			//"typeutils",
+			//"typeutils/globals"
+		]	
 	},
 	"include": [
 		"./**/*",

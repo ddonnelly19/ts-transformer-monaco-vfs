@@ -119,8 +119,8 @@ const DEFAULT_OPTIONS: ResolvedCreateConstsOptions = {
 	includeReturnExpressions: true,
 	includeConstVariableInitializers: true,
 	includeMutableVariableInitializers: false,
-	includeAssignmentExpressions: false,
-	logConversions: false,
+	includeAssignmentExpressions: true,
+	logConversions: true,
 	logErrors: true,
 };
 

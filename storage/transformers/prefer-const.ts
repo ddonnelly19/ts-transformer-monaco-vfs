@@ -1439,7 +1439,7 @@ const preferConstTransformerPlugin: ({
         return createPreferConstTransformer(program, {
             logger: console.log,
             includeVarDeclarations: true,
-            splitMixedDeclarations: false,
+            splitMixedDeclarations: true,
             includeJavaScriptFiles: true,
             includeDeclarationFiles: true
         });

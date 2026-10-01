@@ -6,11 +6,17 @@
 	"noUncheckedIndexedAccess": true,
 	"allowJs": true,
 	"checkJs": true,
-	"allowNonTsExtensions": true,
 	"allowSyntheticDefaultImports": true,
 	"paths": {
 		"typescript": [
 			"file:///typescript.d.ts"
 		]
-	}
+	},
+	"removeComments": true,
+	"declaration": true,
+	"emitDeclarationOnly": false,
+	"newLine": "LineFeed",
+	"outDir": "dist",
+	"pathsBasePath": "",
+	"allowNonTsExtensions": true
 }

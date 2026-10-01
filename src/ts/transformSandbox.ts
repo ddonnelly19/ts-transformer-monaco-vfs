@@ -1,70 +1,74 @@
-import * as tsvfs from "@typescript/vfs"
+import * as tsvfs from "@typescript/vfs";
 import ts from "typescript";
-import { getASTFactory } from "./tsFactory"
-import { getAstStructure } from "../ts-morph/tsmorphUtils"
-import { sourceFileAST } from "./SymbolSerializer"
+import { sourceFileAST } from "./SymbolSerializer";
 
-/**
- * Signature expected of the default export of a user-authored transform
- * script loaded at runtime.
- *
- * Receives the live `program` and `languageServiceHost` and must return a
- * `ts.TransformerFactory` that will be applied to each source file.
- */
-type TransformerFn = (
-	{
-		program,
-		languageServiceHost
-	}: {
-		program?: ts.Program;
-		languageServiceHost?: ts.LanguageServiceHost,
-	}
-) => ts.TransformerFactory<ts.SourceFile>
+/** Signature expected of a dynamically loaded transform module. */
+type TransformerFn = ({
+	program,
+	languageServiceHost,
+}: {
+	program?: ts.Program;
+	languageServiceHost?: ts.LanguageServiceHost;
+}) => ts.TransformerFactory<ts.SourceFile>;
 
 interface RunTransformOutput {
-	/** The transformed TypeScript source code. */
 	transformedTs: string;
-	/** The emitted JavaScript code. */
 	emittedJs: string;
-	/** The generated TypeScript declaration file (.d.ts) content. */
 	dts: string;
-	/** The structure representation of the transformed code. */
-	structure: string
-	/** Array of errors encountered during transformation, each containing a message and error details. */
-	errors: { message: string; error: any }[];
-	/** Array of error positions with line, column, and message information. */
+	structure: string;
+	errors: { message: string; error: unknown }[];
 	errorPositions: { line: number; column: number; message: string }[];
-	/** Runtime debug lines from transformer module loading. */
 	debugLogs: string[];
-	/** The TypeScript compiler options used for the transformation. */
-	compilerOptions: ts.CompilerOptions
+	compilerOptions: ts.CompilerOptions;
 }
 
-/**
- * Input parameters for running a TypeScript transformer.
- */
 interface RunTransformInput {
-	/** The name of the input file being transformed. */
-	inputFileName: string,
-	/** The source code to be transformed. */
-	source: string
-	/** The file path to the transformer module. */
-	transformerPath: string
-	/** Optional TypeScript compiler options to use during transformation. */
-	compilerOptions?: ts.CompilerOptions
+	inputFileName: string;
+	source: string;
+	transformerPath: string;
+	compilerOptions?: ts.CompilerOptions;
+}
+
+function scriptKind(fileName: string): ts.ScriptKind {
+	if (/\.tsx$/i.test(fileName)) return ts.ScriptKind.TSX;
+	if (/\.jsx$/i.test(fileName)) return ts.ScriptKind.JSX;
+	if (/\.[cm]?js$/i.test(fileName)) return ts.ScriptKind.JS;
+	if (/\.json$/i.test(fileName)) return ts.ScriptKind.JSON;
+	return ts.ScriptKind.TS;
+}
+
+function outputFileName(inputFileName: string, extension: ".js" | ".d.ts"): string {
+	const baseName = inputFileName.replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "");
+	return `dist/${baseName}${extension}`;
+}
+
+function collectDiagnostics(
+	diagnostics: readonly ts.Diagnostic[],
+	errors: { message: string; error: unknown }[],
+	errorPositions: { line: number; column: number; message: string }[],
+): void {
+	for (const diagnostic of diagnostics) {
+		const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+		if (diagnostic.file && typeof diagnostic.start === "number") {
+			const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+			errors.push({
+				message: `${diagnostic.file.fileName} (${line + 1},${character + 1})`,
+				error: message,
+			});
+			errorPositions.push({ line: line + 1, column: character + 1, message });
+		} else {
+			errors.push({ message: "Diagnostics", error: message });
+		}
+	}
 }
 
 /**
- * Compiles and runs a user-authored TypeScript transformer against the given
- * source code inside an in-memory Virtual File System.
+ * Runs a source transformer in two compiler passes.
  *
- * Steps performed:
- * 1. Parses `compilerOptions` through `ts.parseJsonConfigFileContent`.
- * 2. Builds a VFS pre-populated with TypeScript standard library files (from CDN).
- * 3. Evaluates the transformer from `./transformer` (the runtime entry point).
- * 4. Emits the transformed source, JavaScript output, and `.d.ts` declarations.
- * 5. Generates an AST structure summary via `getAstStructure`.
- *
+ * Pass 1 transforms and prints the source text.
+ * Pass 2 creates a completely new Program from that transformed text before
+ * type checking and declaration emit. This is required when a transformer
+ * introduces public declarations or changes inferred public types.
  */
 export async function runTransform({
 	inputFileName,
@@ -72,149 +76,111 @@ export async function runTransform({
 	transformerPath,
 	compilerOptions = {},
 }: RunTransformInput): Promise<RunTransformOutput> {
-	const errors: { message: string; error: any }[] = []
-	const errorPositions: { line: number; column: number; message: string }[] = []
-	const debugLogs: string[] = []
+	const errors: { message: string; error: unknown }[] = [];
+	const errorPositions: { line: number; column: number; message: string }[] = [];
+	const debugLogs: string[] = [];
 
-	var parsed = ts.parseJsonConfigFileContent(
-		{
-			compilerOptions,
-			files: []
-		},
-		// we don't do any file lookups - host and base folders should not be used
+	const parsed = ts.parseJsonConfigFileContent(
+		{ compilerOptions, files: [] },
 		{} as ts.ParseConfigHost,
-		"");
+		"",
+	);
 
 	const options: ts.CompilerOptions = {
 		...parsed.options,
-		//target: ts.ScriptTarget.ES2024,
-		//module: ts.ModuleKind.ESNext,
 		declaration: true,
 		emitDeclarationOnly: false,
 		newLine: ts.NewLineKind.LineFeed,
 		outDir: "dist",
-		"allowJs": true,
-		"checkJs": true,
-		"allowNonTsExtensions": true,
-		"allowSyntheticDefaultImports": true,
-		"paths": {
-			"typescript": [
-				"file:///typescript.d.ts"
-			]
-		}
-	}
-	
-	console.info(`Transforming with ${transformerPath}`);
-
-	// Prepare VFS with libs from CDN
-	const fsMap = await tsvfs.createDefaultMapFromCDN(options, ts.version, true, ts);
-	fsMap.set(inputFileName, source)
-	var system = tsvfs.createSystem(fsMap);
-
-	let transformerFactory = async (
-		transformer: TransformerFn,
-		ts: typeof import("typescript"),
-		system: import("typescript").System,
-		compilerHost: import("typescript").CompilerHost,
-		languageServiceHost: import("typescript").LanguageServiceHost,
-		options: import("typescript").CompilerOptions,
-		inputFileName: string
-	) => {
-		var program = ts.createProgram([inputFileName], options, compilerHost);
-		ts.transform(
-			program.getSourceFile(inputFileName)!,
-			//ts.createSourceFile(inputFileName, system.readFile(inputFileName)!, ts.ScriptTarget.ESNext, true),
-			[
-				transformer({ program, languageServiceHost })
-			]
-		)
-			.transformed
-			.forEach(sf => {
-				var txt = ts.createPrinter().printFile(sf);
-				compilerHost.writeFile(sf.fileName, txt, true)
-			});
+		allowJs: true,
+		checkJs: true,
+		allowNonTsExtensions: true,
+		allowSyntheticDefaultImports: true,
+		paths: {
+			...parsed.options.paths,
+			typescript: ["file:///typescript.d.ts"],
+		},
 	};
 
-	const vCh = tsvfs.createVirtualCompilerHost(system, options, ts);
-	const vLsh = tsvfs.createVirtualLanguageServiceHost(system, [inputFileName], options, ts);
+	console.info(`Transforming with ${transformerPath}`);
 
-	// Dynamic imports are cached by URL; add a run-specific query to always load the latest edited transformer.
-	const importPath = `${transformerPath}${transformerPath.includes('?') ? '&' : '?'}t=${Date.now()}`
-	debugLogs.push(`Loading transformer module: ${importPath}`)
-	console.debug('Loading transformer module', { transformerPath, importPath })
-	const transformerModule = await import(/* @vite-ignore */ importPath)
-	debugLogs.push(`Loaded transformer exports: ${Object.keys(transformerModule).join(', ') || '(none)'}`)
-	console.debug('Loaded transformer module exports', Object.keys(transformerModule))
-	if (typeof transformerModule.default !== 'function') {
-		throw new Error(`Transformer module at ${transformerPath} must have a default-exported function`)
-	}
-	var transformerFn = transformerModule.default as TransformerFn
-	await transformerFactory(
-		transformerFn,
-		ts,
-		system,
-		vCh.compilerHost,
-		vLsh.languageServiceHost,
+	const fsMap = await tsvfs.createDefaultMapFromCDN(options, ts.version, true, ts);
+	fsMap.set(inputFileName, source);
+
+	// Pass 1 uses the original program only to give the transformer semantic data.
+	const pass1System = tsvfs.createSystem(fsMap);
+	const pass1CompilerHost = tsvfs.createVirtualCompilerHost(pass1System, options, ts).compilerHost;
+	const pass1LanguageServiceHost = tsvfs.createVirtualLanguageServiceHost(
+		pass1System,
+		[inputFileName],
 		options,
-		inputFileName
+		ts,
+	).languageServiceHost;
+	const pass1Program = ts.createProgram([inputFileName], options, pass1CompilerHost);
+	const pass1SourceFile = pass1Program.getSourceFile(inputFileName);
+	if (!pass1SourceFile) throw new Error(`Source file not found: ${inputFileName}`);
+
+	const importPath = `${transformerPath}${transformerPath.includes("?") ? "&" : "?"}t=${Date.now()}`;
+	console.debug("Loading transformer module", { transformerPath, importPath });
+	const transformerModule = await import(/* @vite-ignore */ importPath);
+	console.debug("Loaded transformer module exports", Object.keys(transformerModule));
+	if (typeof transformerModule.default !== "function") {
+		throw new Error(`Transformer module at ${transformerPath} must have a default-exported function`);
+	}
+
+	const transformerFn = transformerModule.default as TransformerFn;
+	const transformResult = ts.transform(
+		pass1SourceFile,
+		[transformerFn({ program: pass1Program, languageServiceHost: pass1LanguageServiceHost })],
+		options,
 	);
 
-	var env = tsvfs.createVirtualTypeScriptEnvironment(system, [inputFileName], ts, options);
-	var sf = env.getSourceFile(inputFileName);
-	var transformedTsText = env.sys.readFile(inputFileName)!
-
-	var program = ts.createProgram([inputFileName], options, vCh.compilerHost);
-
-	/*const pre = ts.getPreEmitDiagnostics(program)
-	for (const d of pre) {
-		const msg = ts.flattenDiagnosticMessageText(d.messageText, '\n')
-		if (d.file && typeof d.start === 'number') {
-			const { line, character } = ts.getLineAndCharacterOfPosition(d.file, d.start)
-			errors.push({
-				message: `${d.file.fileName} (${line + 1},${character + 1})`,
-				error:  msg})
-			errorPositions.push({ line: line + 1, column: character + 1, message: msg })
-		} else {
-			errors.push({
-				message: "Diagnostics",
-				error: msg
-			})
-		}
-	}*/
-
-	const emitResult = program.emit(sf, undefined, undefined, false, {
-		before: [
-			//(context) => (sf) => sf
-		],
-		after: undefined
-	});
-	for (const d of emitResult.diagnostics) {
-		const msg = ts.flattenDiagnosticMessageText(d.messageText, '\n')
-		if (d.file && typeof d.start === 'number') {
-			const { line, character } = ts.getLineAndCharacterOfPosition(d.file, d.start)
-			errors.push({
-				message: `${d.file.fileName} (${line + 1},${character + 1})`,
-				error: msg
-			})
-			errorPositions.push({ line: line + 1, column: character + 1, message: msg })
-		} else {
-			errors.push({
-				message: "Diagnostics",
-				error: msg
-			})
-		}
+	let transformedTsText: string;
+	try {
+		transformedTsText = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed }).printFile(
+			transformResult.transformed[0] as ts.SourceFile,
+		);
+	} finally {
+		transformResult.dispose();
 	}
 
-	env.languageService.dispose();
+	// Replace the source in the VFS, then discard every pass-1 host/program object.
+	fsMap.set(inputFileName, transformedTsText);
+
+	// Pass 2 is intentionally built from fresh VFS objects so the transformed
+	// declarations are parsed, bound, and type checked before declaration emit.
+	const pass2System = tsvfs.createSystem(fsMap);
+	const pass2VirtualHost = tsvfs.createVirtualCompilerHost(pass2System, options, ts);
+	const pass2CompilerHost = pass2VirtualHost.compilerHost;
+	const pass2Program = ts.createProgram([inputFileName], options, pass2CompilerHost);
+	const pass2SourceFile = pass2Program.getSourceFile(inputFileName);
+	if (!pass2SourceFile) throw new Error(`Transformed source file not found: ${inputFileName}`);
+	
+	const emitResult = pass2Program.emit();
+	const diagnostics = ts.sortAndDeduplicateDiagnostics([
+		//...ts.getPreEmitDiagnostics(pass2Program), 
+		...emitResult.diagnostics
+	]);
+
+	if (diagnostics.length) {
+		console.info(
+			ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+				getCanonicalFileName: pass2Program.getCanonicalFileName,
+				getCurrentDirectory: pass2Program.getCurrentDirectory,
+				getNewLine: pass2CompilerHost.getNewLine,
+			}),
+		);
+	}
+	collectDiagnostics(diagnostics, errors, errorPositions);
 
 	return {
 		transformedTs: transformedTsText,
-		emittedJs: env.sys.readFile('dist/input.js') || '',
-		dts: env.sys.readFile('dist/input.d.ts') || '',
-		structure: getAstStructure(sf!),
+		emittedJs: pass2System.readFile(outputFileName(inputFileName, ".js")) || "",
+		dts: pass2System.readFile(outputFileName(inputFileName, ".d.ts")) || "",
+		structure: sourceFileAST(pass2SourceFile, pass2Program),
 		errors,
 		errorPositions,
 		debugLogs,
-		compilerOptions
-	}
+		compilerOptions: options,
+	};
 }

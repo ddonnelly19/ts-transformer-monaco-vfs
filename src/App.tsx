@@ -576,11 +576,10 @@ export default function App() {
 		//const transformedEditorInstance = transformedEditorRef.current
 		//const transformedModelInstance = transformedModelRef.current
 
-		if (!sourceEditorInstance || !sourceModelInstance 
+		if (!sourceEditorInstance || !sourceModelInstance
 			//|| !transformedEditorInstance 
 			//|| !transformedModelInstance
-			) 
-		{
+		) {
 			return
 		}
 
@@ -788,7 +787,7 @@ export default function App() {
 					{activeOutputTab === 'structure' && <Editor height="100%" theme="vs-dark" defaultLanguage="typescript"
 						defaultPath='file:///structure.ts'
 						value={structure}
-						options={{ fontSize: 14, readOnly: true, minimap: { enabled: false }, automaticLayout: true, "tabSize": 4 }} />}
+						options={{ fontSize: 14, readOnly: false, minimap: { enabled: false }, automaticLayout: true, "tabSize": 4 }} />}
 				</section>
 			</main>
 

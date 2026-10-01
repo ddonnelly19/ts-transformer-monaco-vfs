@@ -1,0 +1,202 @@
+import ts from "typescript";
+
+import { printNode } from "ts-morph";
+import { isNotEmpty } from "./utils";
+
+/**
+ * Tests whether all bits in `value` are set in `flags`.
+ *
+ * @param flags - The bitfield to test.
+ * @param value - The bitmask to look for.
+ * @returns `true` if every bit in `value` is present in `flags`.
+ */
+function hasFlags<T extends number>(flags: T, value: T): boolean {
+	return (flags & value) === value;
+}
+
+function isNode(value: any): value is ts.Node {
+	return (
+		!!value &&
+		(value.constructor.name == "NodeObject" || ts.isSourceFile(value) || (typeof value.kind === "number" && typeof value.pos === "number" && typeof value.end === "number"))
+	);
+}
+
+function getFlagNames<T extends object>(value: number, Flags: T, ...excludeVals: T[keyof T][]): Extract<keyof T, string>[] {
+	//var v = Flags[value];
+	return (Object.keys(Flags) as Extract<keyof T, string>[])
+		.filter((flag) => !excludeVals.includes(Flags[flag]))
+		.filter((flag) => hasFlags(value, Flags[flag] as number))
+		.sort();
+}
+
+function getFlagName<T extends object>(value: number, Flags: T, ...excludeVals: T[keyof T][]): Extract<keyof T, string> | undefined {
+	//var v = Flags[value];
+	return (Object.keys(Flags) as Extract<keyof T, string>[])
+		.filter((flag) => !excludeVals.includes(Flags[flag]))
+		.filter((flag) => Flags[flag] == value)
+		.find(isNotEmpty);
+}
+
+function stableStringify(x: any): string {
+	if (x == null || typeof x !== "object") return JSON.stringify(x);
+	if (Array.isArray(x)) return `[${x.map(stableStringify).join(",")}]`;
+	const keys = Object.keys(x).sort();
+	return `{${keys.map((k) => JSON.stringify(k) + ":" + stableStringify(x[k])).join(",")}}`;
+}
+
+/**
+ * Converts a `Map` to a plain object keyed by stable JSON representations of
+ * the map keys.
+ *
+ * @param m - The map to convert.
+ * @returns A `Record`-like object whose keys are `stableStringify(key)`.
+ */
+function mapToJSON<K, V>(m: Map<K, V>) {
+	return Object.fromEntries(Array.from(m.entries(), ([key, value]) => [typeof key == "string" ? key : stableStringify(key), value]));
+}
+
+/**
+ * Converts a `Set` to a plain array for JSON serialisation.
+ *
+ * @param s - The set to convert.
+ * @returns An array containing all values in insertion order.
+ */
+function setToJSON<T>(s: Set<T>) {
+	return Array.from(s.values());
+}
+
+/**
+ * Type guard: checks whether a value looks like a TypeScript compiler `ts.Symbol`.
+ *
+ * NOTE:
+ * - `ts.Symbol` is an interface (not a runtime class), so `instanceof` isn't possible.
+ * - This is a structural check; it can produce false positives if an object mimics the same shape.
+ */
+export function isTsSymbol(value: unknown): value is ts.Symbol {
+	if (value == null || typeof value !== "object") return false;
+
+	if (value.constructor.name == "SymbolObject") return true;
+	const v = value as Partial<ts.Symbol> & Record<string, unknown>;
+
+	// `flags` is required on ts.Symbol and is a number (enum)
+	if (typeof v.flags !== "number") return false;
+
+	// `escapedName` is required and is usually a string-like internal type.
+	// In practice it's either a string or something string-coercible.
+	if (!("escapedName" in v)) return false;
+
+	// At least one of these usually exists in real Symbols.
+	// (They are optional in the type, but commonly present.)
+	const hasDeclarations =
+		Array.isArray(v.declarations) || typeof (v as any).valueDeclaration === "object" || typeof (v as any).members === "object" || typeof (v as any).exports === "object";
+
+	return hasDeclarations;
+}
+
+/**
+ * Type guard to check if an unknown object is a ts.Type
+ */
+export function isTsType(obj: unknown): obj is ts.Type {
+	return (obj as any).constructor.name == "TypeObject";
+	/* || (
+		typeof obj === "object" &&
+		obj !== null &&
+		!("kind" in obj) &&
+		"id" in obj && 
+		typeof obj.id === "number" &&
+		"flags" in obj &&
+		typeof obj.flags === "number" 
+		// Differentiate from ts.Node (which uses .kind) and ts.Symbol (which uses .flags but has different methods)
+		//typeof (obj as any).getApparentType === "function" &&
+		//typeof (obj as any).getConstraint === "function"
+	);*/
+}
+
+/**
+ * JSON replacer (suitable as the second argument to `JSON.stringify`) that
+ * collapses TypeScript compiler objects into readable plain values:
+ *
+ * - `Map` → object keyed by stable-stringified keys
+ * - `Set` → array
+ * - `Array` → spread copy
+ * - `ts.Symbol` → stripped representation with flag names instead of raw numbers
+ *
+ * When processing a top-level symbol (`key === ""`) the `parent` reference is
+ * included; nested symbols have `parent` omitted to break cycles.
+ *
+ * @param key - The JSON property key (empty string for the root value).
+ * @param obj - The value being stringified.
+ * @returns A JSON-safe representation of `obj`.
+ */
+function createSymbolReplacer(checker?: ts.TypeChecker) {
+	const seen = new WeakSet<object>();
+
+	return function symbolReplacer(key: any, obj: any) {
+		if (obj === null || obj === undefined) return obj;
+
+		if (typeof obj === "object") {
+			if (seen.has(obj)) return undefined;
+			seen.add(obj);
+
+			if (obj instanceof Map) return mapToJSON(obj);
+			if (obj instanceof Set) return setToJSON(obj);
+
+			if (isNode(obj)) {
+				return {
+					kind: getFlagName(obj.kind, ts.SyntaxKind),
+					flags: getFlagName(obj.flags, ts.NodeFlags),
+					fileName: obj.getSourceFile().fileName,
+					pos: obj.pos,
+					end: obj.end,
+					text: printNode(obj),
+				};
+			}
+
+			if (isTsType(obj)) {
+				return {
+					...obj,
+					flags: getFlagName(obj.flags, ts.TypeFlags),
+					symbol: undefined,
+					checker: undefined,
+					id: undefined,
+					objectFlags: getFlagNames((obj as any).objectFlags, ts.ObjectFlags, ts.ObjectFlags.None),
+					freshType: undefined,
+				};
+			}
+
+			if (isTsSymbol(obj)) {
+				try {
+					return {
+						name: obj.name,
+						escapedName: obj.escapedName,
+						parent: undefined,
+						flags: getFlagNames(obj.flags, ts.SymbolFlags, ts.SymbolFlags.None),
+						//id: obj.id,
+						//mergeId: obj.mergeId,
+						//constEnumOnlyModule: !!obj.constEnumOnlyModule,
+						type: checker?.getTypeOfSymbol(obj),
+						members: obj.members,
+						exports: obj.exports,
+						globalExports: obj.globalExports,
+						exportSymbol: obj.exportSymbol,
+						isReferenced: obj.isReferenced ? getFlagNames(obj.isReferenced, ts.SymbolFlags, ts.SymbolFlags.None) : undefined,
+						//lastAssignmentPos: obj.lastAssignmentPos,
+						//isReplaceableByMethod: !!obj.isReplaceableByMethod,
+						//assignmentDeclarationMembers: obj.assignmentDeclarationMembers,
+						declarations: obj.declarations,
+						valueDeclaration: obj.valueDeclaration,
+					};
+				} catch (ex) {
+					return undefined;
+				}
+			}
+		}
+
+		return obj;
+	};
+}
+
+export function sourceFileAST(sourceFile: ts.SourceFile, program?: ts.Program) {
+	const syms = [...(sourceFile.locals?.values() || []), sourceFile.symbol];
+	return syms ? JSON.stringify(syms, createSymbolReplacer(program?.getTypeChecker()), "\t") : "error";
+}
