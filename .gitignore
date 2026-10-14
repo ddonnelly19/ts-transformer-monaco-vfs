@@ -3,3 +3,4 @@ dist/
 .ts-build/
 .vscode/edge-debug-profile/
 .env
+junk/

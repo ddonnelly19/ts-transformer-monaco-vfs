@@ -1,1 +1,1 @@
-fixPrototype.merged.ts
+createConsts.ts
